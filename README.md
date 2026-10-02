@@ -146,15 +146,15 @@ print(lab.compare([r["run_id"]]))
 
 ## Evals
 
-`claude plugin eval .` runs three cases with and without the plugin (ablation): designing a one-knob sweep from a question, reading a compare table honestly, and writing a findings note. Last run (Claude Code 2.1.288, one run per case and arm, 2026-10-03):
+`claude plugin eval .` runs three cases with and without the plugin (ablation): designing a one-knob sweep from a question, reading a compare table honestly, and writing a findings note. Last run (Claude Code 2.1.288, three runs per case and arm, 2026-10-03):
 
 | case | with plugin | without | Δ |
 |---|---|---|---|
-| design-sweep | 1.00 | 0.00 | +1.00 |
-| read-compare | 1.00 | 0.00 | +1.00 |
+| design-sweep | 1.00 | 0.33 | +0.67 |
+| read-compare | 1.00 | 1.00 | 0.00 |
 | write-findings | 1.00 | 0.00 | +1.00 |
 
-The cases do not start the MCP server (no sandbox-safe mock yet); they test what the skills teach Claude to do with the lab's output.
+Reading a compare table is something Claude does well on its own; that case guards the skill's reading rules (direction of each metric, run ids as citations, a seed re-run before a conclusion) rather than adding capability. The cases do not start the MCP server (no sandbox-safe mock yet); they test what the skills teach Claude to do with the lab's output.
 
 ## Limits (honest ones)
 
