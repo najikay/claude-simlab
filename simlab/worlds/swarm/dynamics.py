@@ -1,4 +1,4 @@
-"""Medium presets and vehicle models for the swarm lab (R-8.33c, R-8.33d).
+"""Medium presets and vehicle models for the swarm lab .
 
 **Medium** (``--medium air|water|fog``): a named set of changes to the world that the behaviours
 never see directly. ``air`` is the default and changes nothing. ``water`` adds drag on every
@@ -6,7 +6,7 @@ agent's velocity, a constant current that carries everyone, and acoustic-style c
 (shorter range, seconds of latency, more loss). ``fog`` is a *sensing* preset: the obstacle sense
 range shrinks, range/bearing measurements between agents fail more often and are noisier. Each
 preset states what it is not: none of this is fluid dynamics or light transport, only the
-comparable, describable conditions a swarm question needs (see docs/research/14, layer B).
+comparable, describable conditions a swarm question needs (see docs/WORLDS.md).
 
 **Vehicle** (``--vehicle point|unicycle|fixed-wing|quadrotor-lite``): how an agent turns the
 velocity a behaviour asks for into the velocity it actually gets. ``point`` (default) is the

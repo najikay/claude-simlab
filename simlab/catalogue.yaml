@@ -1,6 +1,7 @@
 # Sim Lab world catalogue: what each world simulates and does not, every knob with its unit and
 # range, the metrics it writes, and example questions with the variant sets that answer them.
-# The MCP server serves this to Claude; the skills quote it. Edit this file when a world changes.
+# The MCP server serves this to Claude; the skills quote it; the lab checks parameters against the
+# ranges here and refuses values outside them. The variants under each question exist in the experiment.
 
 worlds:
 - id: swarm
@@ -33,7 +34,7 @@ worlds:
     ticks:
       unit: ticks
       range:
-      - 50
+      - 10
       - 3000
       means: run length; dt is 0.1 s per tick
       tune: false
@@ -86,8 +87,8 @@ worlds:
       - plan:warehouse
       - plan:maze
       means: 'obstacles: four round pillars; four rooms with doors at the centre; a corridor across the middle;
-        plan:<name> = an ASCII floor plan from simlab/plans (office: four rooms off a corridor; warehouse: shelving
-        aisles; maze: short sight lines); add your own .txt there (# wall, D door)'
+        plan:<name> = an ASCII floor plan (office: four rooms off a corridor; warehouse: shelving aisles;
+        maze: short sight lines); add your own with save_plan (# wall, D door, . free)'
     sense_range:
       unit: m
       range:
@@ -230,10 +231,10 @@ worlds:
     variants:
       open:
         layout: none
-      office:
+      office-los:
         layout: plan:office
         comms: los
-      maze:
+      maze-los:
         layout: plan:maze
         comms: los
   - q: How many anchors does a swarm need to localise from ranging alone?
@@ -352,7 +353,7 @@ worlds:
       range:
       - 0
       - 200
-      means: 0 = as fast as possible; 20 = watch it live
+      means: 0 = as fast as possible; >0 paces a run (ticks per second) for a live viewer of agents.jsonl
       tune: false
     seed:
       unit: '-'
@@ -366,19 +367,19 @@ worlds:
     rpe1_rmse_m: relative pose error over 1 step
     drift_pct: drift as a percentage of path length
   questions:
-  - q: How does ATE grow with drift noise?
+  - q: How does ATE grow with heading drift?
     experiment: synthetic-vo
     metric: ate_rmse_m
     variants:
-      d01:
+      d001:
         noise_model: drift
-        noise: 0.01
-      d05:
+        drift: 0.001
+      d005:
         noise_model: drift
-        noise: 0.05
-      d20:
+        drift: 0.005
+      d02:
         noise_model: drift
-        noise: 0.2
+        drift: 0.02
 missing:
 - doors that open or close during a run (plans are static)
 - real fluid or light models (water and fog are kinematic / sensing presets)

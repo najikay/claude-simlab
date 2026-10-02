@@ -17,6 +17,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_ROOT))
 
 PROTOCOL_VERSION = "2025-06-18"
+SUPPORTED_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 INFO = {"name": "sim-lab", "version": "0.1.0"}
 INSTRUCTIONS = (
     "A robotics simulation lab. Start with catalogue to learn the worlds, their knobs and example "
@@ -33,7 +34,10 @@ try:
 except ImportError as e:  # the server must still answer, with the fix
     Lab = None  # type: ignore[assignment,misc]
     validate_experiment = None  # type: ignore[assignment]
-    IMPORT_ERROR = f"{e}. Install the two dependencies: python3 -m pip install numpy pyyaml"
+    IMPORT_ERROR = (
+        f"{type(e).__name__}: {e} (Python {sys.version.split()[0]} at {sys.executable}). "
+        "The lab needs Python 3.10+ with numpy and pyyaml: python3 -m pip install numpy pyyaml"
+    )
 else:
     IMPORT_ERROR = ""
 
@@ -80,7 +84,7 @@ TOOLS = [
     ),
     _tool(
         "run_experiment",
-        "Run an experiment to completion with optional parameter overrides or a named variant; returns the run id, status, headline metrics and the report. A swarm run of 400 ticks takes a few seconds.",
+        "Run an experiment to completion with optional parameter overrides or a named variant; returns the run id, status, headline metrics and the report (and the tail of its log when it failed). The call blocks until the run ends: a swarm run of 400 ticks takes a few seconds, 3000 ticks with 60 agents about a minute. Values outside the catalogue's ranges are refused.",
         {
             "name": {"type": "string"},
             "params": PARAMS,
@@ -91,7 +95,7 @@ TOOLS = [
     ),
     _tool(
         "run_campaign",
-        "Run several named variants of one experiment one after another and return the comparison table.",
+        "Run several named variants of one experiment one after another and return the comparison table. Blocks until all of them end.",
         {
             "name": {"type": "string"},
             "variants": {
@@ -105,7 +109,7 @@ TOOLS = [
     ),
     _tool(
         "tune",
-        "Search a parameter space for the best headline metric: strategy grid | random | bayes (Gaussian process + expected improvement). Keep budget small; each trial is a run.",
+        "Search a parameter space for the best headline metric: strategy grid | random | bayes (Gaussian process + expected improvement). Each trial is a run and the call blocks until the budget is spent, so keep budget small (max 40). The direction comes from the catalogue unless minimize is given.",
         {
             "name": {"type": "string"},
             "objective": {"type": "string", "description": "a headline metric name"},
@@ -124,13 +128,13 @@ TOOLS = [
     ),
     _tool(
         "get_run",
-        "One run in full: manifest (command, params, timings), metrics, report and the files in its folder.",
+        "One run in full: manifest (command, params, timings, versions, file hashes), metrics, report, the last lines of its stdout.log (the world's own output and errors) and the files in its folder.",
         {"run_id": {"type": "string"}},
         ["run_id"],
     ),
     _tool(
         "compare_runs",
-        "Headline metrics side by side and the best run per metric (lower is better unless the catalogue says otherwise).",
+        "Headline metrics side by side and the best run per metric (lower is better unless the catalogue says otherwise; a tie names no best). Unknown run ids are an error.",
         {"run_ids": {"type": "array", "items": {"type": "string"}, "minItems": 2}},
         ["run_ids"],
     ),
@@ -141,14 +145,14 @@ TOOLS = [
     ),
     _tool(
         "save_plan",
-        "Save an ASCII floor plan under the person's lab folder: # wall, D door, . free; at least 3x3; it becomes layout plan:<name>.",
-        {"name": {"type": "string"}, "text": {"type": "string"}},
+        "Save an ASCII floor plan under the person's lab folder (~/.simlab/plans): # wall, D door, . free, at least 3x3, at least one free cell; it becomes layout plan:<name>. A shipped plan's name is refused unless overwrite is true.",
+        {"name": {"type": "string"}, "text": {"type": "string"}, "overwrite": {"type": "boolean"}},
         ["name", "text"],
     ),
     _tool(
         "save_experiment",
-        "Save an experiment YAML of the person's own (validated: name, command with {run_dir}, params for every placeholder, variants that only set known params).",
-        {"name": {"type": "string"}, "yaml": {"type": "string"}},
+        "Save an experiment YAML of the person's own under ~/.simlab/experiments (validated: name, command with {run_dir}, params for every placeholder, variants that only set known params). The command is any local program the person wants the lab to run and score; it runs on their machine with their rights, so only save a command the person asked for. A shipped experiment's name is refused unless overwrite is true (then their file replaces it for every later run).",
+        {"name": {"type": "string"}, "yaml": {"type": "string"}, "overwrite": {"type": "boolean"}},
         ["name", "yaml"],
     ),
 ]
@@ -162,7 +166,31 @@ def _brief_run(m: dict, report: str | None = None) -> dict:
     out["dir"] = str(lab().runs_dir / m["run_id"])
     if report:
         out["report"] = report
+    if m.get("status") != "done":
+        out["stdout_tail"] = lab().stdout_tail(m["run_id"])
     return out
+
+
+def _need(args: dict, *names: str) -> None:
+    missing = [n for n in names if n not in args]
+    if missing:
+        raise ValueError(f"missing argument(s): {', '.join(missing)}")
+
+
+def _int(args: dict, key: str, default: int, lo: int, hi: int) -> int:
+    v = args.get(key, default)
+    if isinstance(v, bool) or not isinstance(v, int):
+        raise TypeError(f"{key} must be an integer from {lo} to {hi}")
+    if not (lo <= v <= hi):
+        raise ValueError(f"{key} must be from {lo} to {hi}")
+    return v
+
+
+def _bool(args: dict, key: str, default: bool | None) -> bool | None:
+    v = args.get(key, default)
+    if v is not None and not isinstance(v, bool):
+        raise TypeError(f"{key} must be true or false")
+    return v
 
 
 def call(name: str, args: dict) -> str:
@@ -183,8 +211,12 @@ def call(name: str, args: dict) -> str:
             | {"variants": sorted((e.get("variants") or {}).keys())}
             for e in lab().experiments()
         ]
-        return json.dumps(rows, ensure_ascii=False, indent=1)
+        out: Any = rows
+        if lab().skipped:
+            out = {"experiments": rows, "skipped": lab().skipped}
+        return json.dumps(out, ensure_ascii=False, indent=1)
     if name == "get_experiment":
+        _need(args, "name")
         e = lab().experiment(str(args["name"]))
         return json.dumps(
             {
@@ -208,6 +240,7 @@ def call(name: str, args: dict) -> str:
             indent=1,
         )
     if name == "run_experiment":
+        _need(args, "name")
         m = lab().run(
             str(args["name"]),
             args.get("params") or {},
@@ -217,35 +250,56 @@ def call(name: str, args: dict) -> str:
         g = lab().get(m["run_id"])
         return json.dumps(_brief_run(m, g.get("report")), ensure_ascii=False, indent=1)
     if name == "run_campaign":
-        c = lab().campaign(str(args["name"]), args.get("variants") or None, args.get("params") or {})
+        _need(args, "name")
+        variants = args.get("variants")
+        if variants is not None and not (
+            isinstance(variants, list) and all(isinstance(v, str) for v in variants)
+        ):
+            raise ValueError("variants must be a list of names")
+        c = lab().campaign(str(args["name"]), variants or None, args.get("params") or {})
         return json.dumps(c, ensure_ascii=False, indent=1)
     if name == "tune":
+        _need(args, "name", "objective", "space")
+        if not isinstance(args["space"], dict):
+            raise ValueError("space must be an object {param: [values...]}")
         t = lab().tune(
             str(args["name"]),
             str(args["objective"]),
             dict(args["space"]),
-            minimize=bool(args.get("minimize", True)),
-            budget=int(args.get("budget") or 12),
+            minimize=_bool(args, "minimize", None),
+            budget=_int(args, "budget", 12, 1, 40),
             strategy=str(args.get("strategy") or "grid"),
             params=args.get("params") or {},
         )
         return json.dumps(t, ensure_ascii=False, indent=1)
     if name == "list_runs":
         return json.dumps(
-            lab().runs(args.get("experiment") or None, int(args.get("limit") or 30)),
+            lab().runs(args.get("experiment") or None, _int(args, "limit", 30, 1, 200)),
             ensure_ascii=False,
             indent=1,
         )
     if name == "get_run":
+        _need(args, "run_id")
         return json.dumps(lab().get(str(args["run_id"])), ensure_ascii=False, indent=1)
     if name == "compare_runs":
-        return json.dumps(lab().compare([str(x) for x in args["run_ids"]]), ensure_ascii=False, indent=1)
+        _need(args, "run_ids")
+        ids = args["run_ids"]
+        if not isinstance(ids, list) or len(ids) < 2:
+            raise ValueError("run_ids must be a list of at least two run ids")
+        return json.dumps(lab().compare([str(x) for x in ids]), ensure_ascii=False, indent=1)
     if name == "list_plans":
         return json.dumps(lab().plans(), ensure_ascii=False, indent=1)
     if name == "save_plan":
-        return json.dumps(lab().save_plan(str(args["name"]), str(args["text"])), ensure_ascii=False, indent=1)
+        _need(args, "name", "text")
+        p = lab().save_plan(
+            str(args["name"]), str(args["text"]), overwrite=bool(_bool(args, "overwrite", False))
+        )
+        return json.dumps(p, ensure_ascii=False, indent=1)
     if name == "save_experiment":
-        e = lab().save_experiment(str(args["name"]), str(args["yaml"]))
+        _need(args, "name", "yaml")
+        e = lab().save_experiment(
+            str(args["name"]), str(args["yaml"]), overwrite=bool(_bool(args, "overwrite", False))
+        )
         return json.dumps(
             {k: e.get(k) for k in ("name", "description", "params", "variants", "file")},
             ensure_ascii=False,
@@ -262,19 +316,28 @@ def handle(msg: Any) -> dict | None:
             "id": None,
             "error": {"code": -32600, "message": "a request must be a JSON object"},
         }
-    rid, method, params = msg.get("id"), msg.get("method", ""), msg.get("params")
+    rid, method, params = msg.get("id"), msg.get("method"), msg.get("params")
     if params is None:
         params = {}
-    if rid is None:
+    if "id" not in msg:  # a notification: no answer, whatever it was
         return None
+    if not isinstance(rid, (str, int)) or isinstance(rid, bool):
+        return {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {"code": -32600, "message": "id must be a string or a number"},
+        }
+    if not isinstance(method, str) or not method:
+        return {"jsonrpc": "2.0", "id": rid, "error": {"code": -32600, "message": "a request needs a method"}}
     if not isinstance(params, dict):
         return {"jsonrpc": "2.0", "id": rid, "error": {"code": -32602, "message": "params must be an object"}}
     if method == "initialize":
+        asked = str(params.get("protocolVersion") or PROTOCOL_VERSION)
         return {
             "jsonrpc": "2.0",
             "id": rid,
             "result": {
-                "protocolVersion": PROTOCOL_VERSION,
+                "protocolVersion": asked if asked in SUPPORTED_VERSIONS else PROTOCOL_VERSION,
                 "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": INFO,
                 "instructions": INSTRUCTIONS + (f" NOTE: {IMPORT_ERROR}" if IMPORT_ERROR else ""),

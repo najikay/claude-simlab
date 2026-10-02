@@ -49,7 +49,7 @@ def main() -> int:
         "--rate",
         type=float,
         default=0.0,
-        help="steps per second to emit (0 = as fast as possible); lets the UI watch live",
+        help="steps per second to emit (0 = as fast as possible); >0 paces a run for a live viewer",
     )
     ap.add_argument(
         "--dropout-rate",

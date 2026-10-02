@@ -20,4 +20,4 @@ The lab runs on the user's machine through the `sim-lab` tools. A run is a folde
 - Numbers come from `metrics.json` through the tools, never from memory or from what "should" happen.
 - Say the run ids; they are the citation.
 - When the user's folder has its own experiments (`own: true` in `list_experiments`), use theirs over the shipped one of the same name.
-- A failed run (`status: error`) is reported with the first lines of its `stdout.log` (`get_run`), not retried blindly.
+- A failed run (`status: error`) is reported with its `error` and the `stdout_tail` the tools return (the world's own message), not retried blindly. A value outside the catalogue's range is refused before anything runs: pick one inside it.

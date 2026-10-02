@@ -141,8 +141,24 @@ def test_run_stamps_are_strictly_increasing_even_when_the_clock_stalls(lab):
 
 def test_parameter_values_cannot_add_a_shell_command(lab):
     marker = lab.home / "pwned"
-    m = lab.run("synthetic-vo", {"steps": 30, "rate": 0, "shape": f"circle; touch {marker}"})
+    script = lab.home / "echo.py"
+    script.write_text(
+        "import json, pathlib, sys\n"
+        "pathlib.Path(sys.argv[1]).joinpath('metrics.json').write_text("
+        "json.dumps({'headline': {'n': len(sys.argv[2]), 'argc': len(sys.argv)}}))\n",
+        encoding="utf-8",
+    )
+    lab.save_experiment(
+        "echo", f"name: echo\ncommand: '{{python}} {script} {{run_dir}} {{word}}'\nparams: {{word: hi}}\n"
+    )
+    evil = f"x; touch {marker}; $(touch {marker}) | cat"
+    m = lab.run("echo", {"word": evil})
+    assert m["status"] == "done", m["error"]
     assert not marker.exists(), "a parameter value ran as a second command"
-    assert m["status"] == "error"  # the world rejects the odd shape and exits non-zero
+    assert m["headline"] == {"n": len(evil), "argc": 3}  # it arrived as one word
     with pytest.raises(ValueError, match="numbers or strings"):
         lab.run("synthetic-vo", {"steps": [1, 2]})
+    with pytest.raises(ValueError, match="outside the catalogue range"):
+        lab.run("synthetic-vo", {"steps": 0})
+    with pytest.raises(ValueError, match="not one of"):
+        lab.run("synthetic-vo", {"shape": "square"})

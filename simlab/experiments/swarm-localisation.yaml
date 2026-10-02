@@ -1,13 +1,15 @@
 name: swarm-localisation
 description: Cooperative localisation — agents on a coverage mission with a unicycle EKF fed by noisy odometry, a position fix only every fix_every ticks, and range + bearing to neighbours (their broadcast beliefs are the landmarks). Compares odometry alone, the naive EKF update (assumes independence; can diverge because the neighbours' beliefs were built from our own messages) and covariance intersection (consistent under unknown correlation), with and without well-localised anchor agents.
 tags: [swarm, localisation, ekf, sensor-fusion]
-command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission {mission} --policy rules --comm-range {comm_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief ekf --odom-noise {odom_noise} --fix-every {fix_every} --anchors {anchors} --fuse-neighbours {fuse_neighbours} --rb-fusion {rb_fusion} --range-noise {range_noise} --bearing-noise-deg {bearing_noise_deg} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission {mission} --policy rules --layout {layout} --comms {comms} --comm-range {comm_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief ekf --odom-noise {odom_noise} --fix-every {fix_every} --anchors {anchors} --fuse-neighbours {fuse_neighbours} --rb-fusion {rb_fusion} --range-noise {range_noise} --bearing-noise-deg {bearing_noise_deg} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
 cwd: "{repo}"
-timeout_s: 1800
+timeout_s: 600
 params:
   agents: 8
   ticks: 300
   mission: coverage      # coverage keeps everyone moving, so odometry drifts and ranging matters
+  layout: none           # none | pillars | rooms | corridor | plan:office | plan:warehouse | plan:maze
+  comms: range           # range | los (walls block the link)
   comm_range: 30.0
   msg_loss: 0.0
   msg_latency: 0
@@ -24,8 +26,12 @@ params:
   rate: 0
   seed: 7
 outputs: {}
-metrics: [belief_error, connected_pct, mean_lambda2]
+metrics: [belief_error_m, connected_pct, mean_lambda2, coverage_pct, collisions, msg_loss_pct]
 variants:
+  a0:              { anchors: 0 }
+  a1:              { anchors: 1 }
+  a2:              { anchors: 2 }
+  a4:              { anchors: 4 }
   odometry-only:   { fuse_neighbours: 0 }
   naive-fusion:    { rb_fusion: naive }
   ci-fusion:       { rb_fusion: ci }

@@ -1,14 +1,16 @@
 name: swarm-formation
 description: Swarm lab — N agents hold a ring formation from consensus over a lossy, delayed radio; the baseline question for comms, belief filters, floor plans, media and vehicle models.
 tags: [swarm, multi-agent, planning, comms]
-command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission formation --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief-alpha {belief_alpha} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --fix-every {fix_every} --anchors {anchors} --formation-radius {formation_radius} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission formation --arena {arena} --current {current} --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief-alpha {belief_alpha} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --fix-every {fix_every} --anchors {anchors} --formation-radius {formation_radius} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
 cwd: "{repo}"
-timeout_s: 1800
+timeout_s: 600
 params:
   policy: rules          # rules | random — who picks each agent's behaviour each interval
   decision_every: 10     # ticks between decisions
   agents: 12
   ticks: 400
+  arena: 40.0           # side of the square arena (m)
+  current: "0.3,0"       # water only: the current as vx,vy (m/s)
   comms: range          # range: any pair within comm_range talks | los: walls also block the link
   layout: none           # none | pillars | rooms (four rooms with doors) | corridor | plan:office | plan:warehouse | plan:maze (simlab/plans)
   sense_range: 3.0       # metres within which an agent senses an obstacle and steers away
@@ -25,11 +27,18 @@ params:
   formation_radius: 6.0
   medium: air            # air | water (drag, current, acoustic links) | fog (sensing only)
   vehicle: point         # point | unicycle | fixed-wing | quadrotor-lite
-  rate: 0                # ticks per second to emit (0 = fast; 20 = watch live)
+  rate: 0                # ticks per second to emit (0 = as fast as possible); >0 paces a run for a live viewer
   seed: 7
 outputs: {}              # no trajectories to score against truth: the simulator writes metrics.json
-metrics: [formation_error, coverage, collisions, msg_loss]
+metrics: [formation_error_m, coverage_pct, collisions, msg_loss_pct, connected_pct, mean_lambda2, belief_error_m, obstacle_hits, blocked_links_pct]
 variants:
+  loss0:          { msg_loss: 0.0 }
+  loss30:         { msg_loss: 0.3 }
+  loss60:         { msg_loss: 0.6 }
+  open:           { layout: none }
+  air:            { medium: air }
+  water-exp:      { medium: water, belief: exp }
+  water-kf:       { medium: water, belief: kf }
   ideal:          { msg_loss: 0.0, msg_latency: 0, obs_noise: 0.05 }
   lossy-comms:    { msg_loss: 0.3 }
   delayed-comms:  { msg_latency: 5 }

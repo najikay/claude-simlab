@@ -20,7 +20,7 @@ def test_alignment_removes_a_rigid_transform_and_keeps_an_offset():
     moved = gt @ rot.T + np.array([3.0, -1.0, 0.5])
     assert ate(moved, gt)["rmse"] == pytest.approx(0.0, abs=1e-9)
     assert ate(moved, gt, align=False)["rmse"] > 1.0
-    r, t, aligned = align_svd(moved, gt)
+    r, _t, aligned = align_svd(moved, gt)
     assert np.allclose(aligned, gt, atol=1e-9) and abs(np.linalg.det(r) - 1) < 1e-9
     noisy = gt + np.array([0.3, 0.0, 0.0]) * np.where(np.arange(50) % 2 == 0, 1, -1)[:, None]
     assert ate(noisy, gt)["rmse"] == pytest.approx(0.3, abs=1e-6)

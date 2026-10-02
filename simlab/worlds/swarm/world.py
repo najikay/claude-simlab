@@ -1,4 +1,4 @@
-"""Obstacles and room layouts for the swarm lab (R-8.33a).
+"""Obstacles and room layouts for the swarm lab.
 
 Obstacles are circles (``pillars``) and axis-aligned boxes (``walls``) in the arena. They give the
 worlds their first vocabulary beyond an empty square: closed rooms, corridors, pillars. Agents sense
@@ -41,14 +41,17 @@ def plan_names() -> list[str]:
 
 
 def parse_plan(text: str) -> list[str]:
-    """Grid rows of a plan: comment lines (``#`` followed by a space) and blank lines dropped."""
-    # a comment is a line with text beyond the plan characters ("# office: four rooms");
-    # "#  ....#" is a wall row that happens to hold a space
+    """Grid rows of a plan: comment lines (``# `` followed by text) and blank lines dropped."""
+    # a comment is "# " followed by text beyond the plan characters ("# office: four rooms");
+    # "#  ....#" is a wall row that happens to hold spaces, and a typo row is an error, not a comment
     rows = [
         ln.rstrip("\n")
         for ln in text.splitlines()
-        if ln.strip() and not (ln.startswith("#") and any(c not in "#.D " for c in ln))
+        if ln.strip() and not (ln.startswith("# ") and any(c not in "#.D " for c in ln))
     ]
+    bad = sorted({c for r in rows for c in r if c not in "#.D "})
+    if bad:
+        raise ValueError(f"plan: only # . D and space are allowed; found {''.join(bad)!r}")
     if not rows:
         raise ValueError("an empty plan")
     width = max(len(r) for r in rows)

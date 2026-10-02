@@ -34,7 +34,16 @@ claude plugin install sim-lab@claude-simlab
 python3 -m pip install numpy pyyaml
 ```
 
-Or from the Claude directory: install Sim Lab, then run the `pip` line once. The server tells you if the two packages are missing. On Windows, make sure `python3` is on `PATH` (the Python installer's "App execution aliases" or `py` launcher both work; the server runs with whatever `python3` resolves to).
+Or from the Claude directory: install Sim Lab, then install the two packages once. The server starts as `python3` and tells you (in the tool error) which interpreter it is running and what is missing.
+
+- **Debian, Ubuntu, Homebrew** refuse `pip install` into the system Python ("externally managed"). Use the distribution's packages (`sudo apt install python3-numpy python3-yaml`), or `python3 -m pip install --user --break-system-packages numpy pyyaml`, or point Claude Code at a virtualenv's interpreter (below).
+- **Windows**: `python3` must resolve to a real interpreter. The Microsoft Store Python provides it; a python.org install provides only `python` and `py`. Either install Python from the Store, or register the server yourself with the interpreter you have, which also works for a virtualenv anywhere:
+
+  ```
+  claude mcp add sim-lab -- python "<path to the installed plugin>\servers\simlab_server.py"
+  ```
+
+  (`claude plugin list` shows where the plugin was installed.)
 
 Runs are kept under `~/.simlab/runs/` (set `SIMLAB_HOME` to move them). Your own experiments and floor plans go in `~/.simlab/experiments/` and `~/.simlab/plans/`; the tools `save_experiment` and `save_plan` write there.
 
@@ -43,21 +52,25 @@ Runs are kept under `~/.simlab/runs/` (set `SIMLAB_HOME` to move them). Your own
 ```
 you:    Does message loss above 30 % break a 12-drone ring formation?
 
-claude: (reads the catalogue once, picks swarm-formation and the loss0/loss30/loss60 variants,
-         says four runs will take about 20 seconds, runs the campaign, compares)
+claude: (reads the catalogue once, picks swarm-formation and the loss0 / loss30 / loss60 variants
+         plus a 0.9 run, says four runs will take about five seconds, runs them, compares)
 
-        Up to 30 % loss the formation closes (0.42 → 0.47 m mean slot error); at 60 % it does not
-        (1.95 m) and the first collisions appear. Runs 20261003-010101-a1b2…, …
+        No. At the defaults (12 agents, 20 m radio on a 40 m arena, 400 ticks, seed 7) the mean
+        slot error stays within 0.086–0.089 m from 0 % to 90 % loss. What loss does change is
+        collisions: 6 → 16 → 15 → 18, because agents learn about their neighbours later.
 
-        | run | msg_loss | formation_error_m | collisions |
-        | … | 0.0 | 0.42 | 0 |
-        | … | 0.3 | 0.47 | 0 |
-        | … | 0.6 | 1.95 | 1 |
+        | run                                   | msg_loss | formation_error_m | collisions | connected_pct |
+        | 20261002-220648-5229_swarm-formation  | 0.0      | 0.086             | 6          | 100 |
+        | 20261002-220649-db2c_swarm-formation  | 0.3      | 0.087             | 16         | 100 |
+        | 20261002-220650-afe4_swarm-formation  | 0.6      | 0.089             | 15         | 100 |
+        | 20261002-220651-0fbd_swarm-formation  | 0.9      | 0.088             | 18         | 100 |
 
-        The break is between 0.3 and 0.6; I can sweep 0.4 and 0.5 with a second seed to pin it.
+        A second seed agrees (0.074 m and 0.076 m at 0.6 and 0.9). The radio is dense enough that one
+        message in ten still carries consensus; what would break it is latency or range (the
+        delayed-comms and short-range variants), or walls blocking links (office-los). Want those?
 ```
 
-Ask for "a findings note" and the second skill writes the page above with the run ids as citations.
+The numbers above are from real runs on this machine. Ask for "a findings note" and the second skill writes a page with the run ids as citations.
 
 ## Tools
 
@@ -71,7 +84,7 @@ Ask for "a findings note" and the second skill writes the page above with the ru
 | `list_runs`, `get_run` | Past runs with their metrics; one run with its manifest, report and folder. |
 | `compare_runs` | A table across runs with the best run per metric, direction-aware. |
 | `list_plans`, `save_plan` | ASCII floor plans (`#` wall, `D` door, `.` free); saved plans become `layout: plan:<name>`. |
-| `save_experiment` | Your own experiment YAML, validated before it is written. |
+| `save_experiment` | Your own experiment YAML, validated before it is written. Its `command` is a local program the lab will run for you, so Claude only saves one you asked for; a shipped name is refused unless you say overwrite. |
 
 ## Experiments shipped
 
@@ -97,19 +110,20 @@ A run is reproducible from its folder alone:
   trajectory.svg · metrics.svg · agents.jsonl · obstacles.json
 ```
 
-Seeds are explicit. The skill tells Claude to re-run a close call with another seed before believing it.
+Seeds are explicit, the manifest records the lab, Python and NumPy versions and a hash of the experiment file and the floor plan, and a run that the lab process did not live to finish is marked `interrupted` rather than left `running`. The skill tells Claude to re-run a close call with another seed before believing it.
 
 ## Data handling
 
 - Everything runs on your machine: the MCP server is a local process started by Claude Code; the worlds are Python scripts in this repository.
 - Nothing is sent anywhere. The plugin makes no network requests, has no telemetry and needs no account or key.
 - What is written: run folders under `~/.simlab` (or `SIMLAB_HOME`), and the experiments and plans you ask Claude to save there. Delete the folder to delete everything.
-- The server runs experiments only from the shipped YAML or from files in your lab folder; commands are composed from the experiment's template and typed parameters, never from free text.
+- The server runs experiments only from the shipped YAML or from files in your lab folder. Commands are composed from the experiment's template and typed parameters, every value quoted as a single argument and run without a shell, and values are checked against the catalogue's ranges first.
+- `save_experiment` registers a command of your own that the lab will run on later requests, with your rights. Claude is told to save only what you asked for, shipped names cannot be replaced by accident (an explicit `overwrite` is needed), and every run's manifest records which file and plan it used, with their hashes.
 
 ## Development
 
 ```
-python3 -m pip install -r requirements-dev.txt
+python3 -m pip install -r requirements-dev.txt   # numpy, pyyaml, pytest, ruff, pillow (figures)
 python3 -m pytest -q                      # world, dynamics, lab, server (fake stdio)
 ruff check .
 claude plugin validate --strict .
@@ -130,7 +144,7 @@ print(lab.compare([r["run_id"]]))
 
 ## Evals
 
-`claude plugin eval .` runs three cases with and without the plugin (ablation): designing a one-knob sweep from a question, reading a compare table honestly, and writing a findings note. Last run (Claude Code 2.1.288, 3 runs per case, 2026-10-03):
+`claude plugin eval .` runs three cases with and without the plugin (ablation): designing a one-knob sweep from a question, reading a compare table honestly, and writing a findings note. Last run (Claude Code 2.1.288, one run per case and arm, 2026-10-03):
 
 | case | with plugin | without | Δ |
 |---|---|---|---|

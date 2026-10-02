@@ -1,12 +1,14 @@
 name: swarm-coverage
 description: Swarm lab — cover an arena with N agents that only know what their neighbours told them; compare comms conditions and decision policies on coverage, collisions and messages.
 tags: [swarm, multi-agent, coverage, comms]
-command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission coverage --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --coverage-cells {coverage_cells} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission coverage --arena {arena} --current {current} --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --coverage-cells {coverage_cells} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
 cwd: "{repo}"
-timeout_s: 1800
+timeout_s: 600
 params:
   agents: 10
   ticks: 500
+  arena: 40.0            # side of the square arena (m)
+  current: "0.3,0"       # water only: the current as vx,vy (m/s)
   policy: rules
   decision_every: 10
   comms: range          # range: any pair within comm_range talks | los: walls also block the link
@@ -25,8 +27,10 @@ params:
   rate: 0
   seed: 7
 outputs: {}
-metrics: [coverage, collisions, msg_loss]
+metrics: [coverage_pct, collisions, msg_loss_pct, connected_pct, mean_lambda2, belief_error_m, obstacle_hits, blocked_links_pct]
 variants:
+  open:           { layout: none }
+  rooms:          { layout: rooms, comms: range }
   ideal:          { msg_loss: 0.0, obs_noise: 0.05 }
   lossy-comms:    { msg_loss: 0.5 }
   short-range:    { comm_range: 6.0 }

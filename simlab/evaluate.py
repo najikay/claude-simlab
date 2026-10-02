@@ -1,6 +1,6 @@
-"""Trajectory evaluation (R-8.4 first cut): ATE / RPE in NumPy, no evo, no ROS.
+"""Trajectory evaluation : ATE / RPE in NumPy, no evo, no ROS.
 
-Ported from the user's ``Monocular-SLAM-Pipeline`` (D-25): the SVD (Kabsch/Umeyama without
+The SVD (Kabsch/Umeyama without
 scale) alignment and the timestamp association. Files are TUM format::
 
     timestamp tx ty tz qx qy qz qw
@@ -55,7 +55,7 @@ def associate(t_a: np.ndarray, t_b: np.ndarray, max_diff: float = 0.02) -> tuple
 
 
 def align_svd(est: np.ndarray, gt: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Rigid alignment est → gt (rotation R, translation t, aligned est). No scale (D-25 port)."""
+    """Rigid alignment est → gt (rotation R, translation t, aligned est). No scale."""
     mu_e, mu_g = est.mean(axis=0), gt.mean(axis=0)
     w = (est - mu_e).T @ (gt - mu_g)
     u, _, vt = np.linalg.svd(w)

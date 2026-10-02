@@ -1,4 +1,4 @@
-"""Swarm / multi-agent simulator (Phase 8b, R-8.22 to R-8.26): communication, decisions, planning under uncertainty.
+"""Swarm / multi-agent simulator : communication, decisions, planning under uncertainty.
 
 Pure NumPy, 2-D, discrete ticks. Built for the master's questions rather than for pretty physics:
 
@@ -596,7 +596,7 @@ def run(a: argparse.Namespace) -> dict:
                         # the landmark is j's *belief* of itself (what it broadcast), so j's own uncertainty
                         # enters the measurement noise (range directly, bearing as sigma / range); and we only
                         # listen to neighbours that know their position better than we know ours, which
-                        # keeps the correlated-error feedback loop (see docs/research/12) from building up
+                        # keeps the correlated-error feedback loop (see docs/WORLDS.md) from building up
                         sig_lm = math.hypot(ekfs[j].pos_sigma, a.max_speed * a.dt)  # its belief, one tick old
                         if sig_lm >= ekfs[i].pos_sigma:
                             continue
@@ -937,7 +937,10 @@ def main() -> int:
     ap.add_argument("--max-accel", dest="max_accel", type=float, default=4.0)
     ap.add_argument("--collision-r", dest="collision_r", type=float, default=0.8)
     ap.add_argument(
-        "--rate", type=float, default=0.0, help="ticks per second to emit (0 = fast); lets the UI watch live"
+        "--rate",
+        type=float,
+        default=0.0,
+        help="ticks per second to emit (0 = as fast as possible); >0 paces a run for a live viewer",
     )
     ap.add_argument("--seed", type=int, default=7)
     run(ap.parse_args())

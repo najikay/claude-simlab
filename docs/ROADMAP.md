@@ -8,5 +8,5 @@ What Sim Lab does not do yet, roughly in the order it would be useful. Issues an
 - **Real estimators in the VO world**: plug a trajectory file from your own pipeline into the same ATE/RPE scoring.
 - **Pursuit and interception scenarios** (adversaries), kept out deliberately for now.
 - **Live view**: `rate > 0` already paces a run for a viewer; a small local page that follows `agents.jsonl` is the natural next step.
-- **Statistics across seeds**: `tune` already runs repeats; a `repeat` tool that returns mean ± sd per metric would make the "is this real?" check one call.
+- **Statistics across seeds**: a `repeat` tool that runs one configuration over N seeds and returns mean ± sd per metric would make the "is this real?" check one call (today the skill asks for a second seed by hand).
 - **Export**: a campaign as CSV, a run as a zip with everything needed to cite it.

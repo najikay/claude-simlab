@@ -16,7 +16,7 @@ Sim Lab ships two worlds. The catalogue (`simlab/catalogue.yaml`) is the authori
 
 **Behaviours.** `flock` (alignment, cohesion, separation), `formation` (consensus on ring slots of radius `formation_radius`; `formation_error_m` is the mean distance from the slot), `rendezvous` (`consensus_error_m`), `coverage` (each agent heads for its least-visited cell of a `coverage_cells` × `coverage_cells` grid; `coverage_pct`), `goto` (greedy target allocation). The `policy` decides each agent's behaviour every `decision_every` ticks: `rules` (separation first, then the mission, rendezvous when isolated) or `random` (a control).
 
-**Obstacles and plans.** `layout: pillars | rooms | corridor` are built in; `plan:<name>` loads an ASCII floor plan from `simlab/plans/` or your lab's `plans/` folder (`#` wall, `D` door, `.` free; each cell is one metre, scaled to the arena). Agents sense walls within `sense_range` and steer away; an agent that still hits one is stopped (`obstacle_hits`). Doors are static openings.
+**Obstacles and plans.** `layout: pillars | rooms | corridor` are built in; `plan:<name>` loads an ASCII floor plan from the shipped plans or your lab's `~/.simlab/plans/` folder (saved with `save_plan`) (`#` wall, `D` door, `.` free; the grid is scaled so its longer side spans the arena, so a 20-column plan on a 40 m arena has 2 m cells). Agents sense walls within `sense_range` and steer away; an agent that still hits one is stopped (`obstacle_hits`). Doors are static openings.
 
 **Media.** `air` changes nothing. `water` adds 40 %/s drag, a `current` (m/s), and acoustic links: half the range, +5 ticks latency, +20 % loss. `fog` touches sensing only: obstacles seen at 40 % range, half the range/bearing measurements missed and the rest twice as noisy.
 
@@ -30,7 +30,7 @@ Sim Lab ships two worlds. The catalogue (`simlab/catalogue.yaml`) is the authori
 
 A true camera path (`shape: circle | lemniscate`, `steps` poses) and an estimate derived from it by a chosen error model: `gaussian` white position noise (`noise`), `drift` heading drift per step (`drift`), `scale` relative step-length error (`scale_err`), `outliers` 10× jumps on a fraction of steps (`outlier_rate`), or `mixed` (all of them). `dropout_rate`/`dropout_len` remove windows of estimate poses; `latency` stamps the estimate late so association suffers. Both trajectories are written as TUM files and scored by `simlab/evaluate.py`: ATE RMSE after alignment, RPE over one step, and drift as a percentage of path length.
 
-There is no image and no estimator: this world exists to test evaluation chains, noise models and the run → metrics → compare contract with something that finishes in under a second.
+There is no image and no estimator: this world exists to test evaluation chains, noise models and the run → metrics → compare contract with something that finishes in well under a second (`rate: 0`; a positive `rate` paces the run for a live viewer).
 
 ## Adding a world
 

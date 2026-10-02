@@ -1,4 +1,4 @@
-"""A small Bayesian optimiser for the parameter search (R-8.27, ``strategy: bayes``).
+"""A small Bayesian optimiser for the parameter search (``strategy: bayes``).
 
 Sequential model-based search with a Gaussian process (RBF kernel) fitted on the points tried so
 far and expected improvement over a pool of candidates. NumPy only, meant for the lab's sizes: a
