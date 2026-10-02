@@ -2,6 +2,8 @@
 
 # Sim Lab
 
+[![tests](https://github.com/najikay/claude-simlab/actions/workflows/tests.yml/badge.svg)](https://github.com/najikay/claude-simlab/actions/workflows/tests.yml) ![licence](https://img.shields.io/badge/licence-Apache--2.0-blue) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
+
 **A robotics simulation lab for Claude.** Ask a question about a swarm, a formation, coverage, cooperative localisation or visual odometry, and Claude designs the experiment, runs it on your machine, compares the runs and answers with numbers you can reproduce.
 
 > "Does a formation of 12 drones still close when the radio drops 60 % of messages?"
