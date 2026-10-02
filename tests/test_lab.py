@@ -137,3 +137,12 @@ def test_run_stamps_are_strictly_increasing_even_when_the_clock_stalls(lab):
     a = lab.run("synthetic-vo", {"steps": 30, "rate": 0}, variant="clean")["run_id"]
     b = lab.run("synthetic-vo", {"steps": 30, "rate": 0}, variant="clean")["run_id"]
     assert a.split("_")[0] < b.split("_")[0] and a != b
+
+
+def test_parameter_values_cannot_add_a_shell_command(lab):
+    marker = lab.home / "pwned"
+    m = lab.run("synthetic-vo", {"steps": 30, "rate": 0, "shape": f"circle; touch {marker}"})
+    assert not marker.exists(), "a parameter value ran as a second command"
+    assert m["status"] == "error"  # the world rejects the odd shape and exits non-zero
+    with pytest.raises(ValueError, match="numbers or strings"):
+        lab.run("synthetic-vo", {"steps": [1, 2]})

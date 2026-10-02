@@ -13,6 +13,7 @@ import json
 import os
 import random
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -143,17 +144,23 @@ class Lab:
         run_id = re.sub(r"[^A-Za-z0-9_-]+", "-", f"{self._next_stamp()}-{uuid.uuid4().hex[:4]}_{name}")
         run_dir = self.runs_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=False)
-        subs = {
-            "python": self.python,
-            "repo": str(ROOT.parent),
-            "run_dir": str(run_dir),
-            **{k: str(v) for k, v in merged.items()},
+        bad = [k for k, v in merged.items() if not isinstance(v, (int, float, str)) or isinstance(v, bool)]
+        if bad:
+            raise ValueError(f"parameter values must be numbers or strings: {bad}")
+        raw = {"python": self.python, "repo": str(ROOT.parent), "run_dir": str(run_dir)}
+        # every value is quoted as one shell word and the command runs without a shell: a parameter
+        # can never add a second command, however it was typed
+        subs = {k: shlex.quote(v) for k, v in raw.items()} | {
+            k: shlex.quote(str(v)) for k, v in merged.items()
         }
         try:
             command = str(exp["command"]).format(**subs)
-            cwd = str(exp.get("cwd") or "{repo}").format(**subs)
-        except KeyError as e:
-            raise ValueError(f"the command needs a parameter that is not set: {e}") from e
+            cwd = str(exp.get("cwd") or "{repo}").format(**raw, **{k: str(v) for k, v in merged.items()})
+            argv = shlex.split(command)
+        except (KeyError, ValueError) as e:
+            raise ValueError(f"the command needs a parameter that is not set, or is malformed: {e}") from e
+        if not argv:
+            raise ValueError("the command is empty")
         m = {
             "run_id": run_id,
             "experiment": name,
@@ -180,8 +187,7 @@ class Lab:
             env = {**os.environ, "SIMLAB_PLANS": str(self.home / "plans"), "PYTHONIOENCODING": "utf-8"}
             with (run_dir / "stdout.log").open("w", encoding="utf-8") as log:
                 r = subprocess.run(
-                    command,
-                    shell=True,
+                    argv,
                     cwd=cwd,
                     env=env,
                     stdout=log,
