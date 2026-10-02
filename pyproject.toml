@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claude-simlab"
+version = "0.1.0"
+description = "Sim Lab: robotics experiments for Claude — swarms, visual odometry, floor plans; run → metrics → compare, with an MCP server."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Naji Kayal" }]
+dependencies = ["numpy>=1.24", "pyyaml>=6"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+include = ["simlab*"]
+
+[tool.setuptools.package-data]
+simlab = ["experiments/*.yaml", "plans/*.txt", "catalogue.yaml", "worlds/**/*.py"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"

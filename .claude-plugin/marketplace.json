@@ -1,0 +1,32 @@
+{
+  "name": "claude-simlab",
+  "owner": {
+    "name": "Naji Kayal",
+    "url": "https://github.com/najikay"
+  },
+  "metadata": {
+    "description": "Sim Lab: a robotics simulation lab for Claude (swarms, formations, coverage, cooperative localisation, synthetic visual odometry) with an MCP server that runs experiments locally."
+  },
+  "plugins": [
+    {
+      "name": "sim-lab",
+      "source": "./",
+      "description": "A robotics simulation lab for Claude: ask what happens to a swarm, a formation, coverage or localisation under message loss, latency, noise, walls, water or fog, and Claude designs the experiment, runs it on your machine, compares the runs and answers with numbers you can reproduce.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Naji Kayal"
+      },
+      "keywords": [
+        "robotics",
+        "simulation",
+        "swarm",
+        "multi-agent",
+        "slam",
+        "visual-odometry",
+        "experiments",
+        "mcp"
+      ],
+      "license": "Apache-2.0"
+    }
+  ]
+}

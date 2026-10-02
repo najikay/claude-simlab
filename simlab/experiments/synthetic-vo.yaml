@@ -1,0 +1,34 @@
+name: synthetic-vo
+description: Synthetic visual odometry (no simulator, no dataset) — proves the run → eval → report contract; tune noise and drift and watch ATE/RPE move.
+tags: [slam, synthetic, smoke]
+command: "{python} simlab/worlds/vo/synthetic_vo.py --out {run_dir} --seed {seed} --noise-model {noise_model} --noise {noise} --drift {drift} --scale-err {scale_err} --outlier-rate {outlier_rate} --steps {steps} --shape {shape} --rate {rate} --dropout-rate {dropout_rate} --dropout-len {dropout_len} --latency {latency}"
+cwd: "{repo}"
+timeout_s: 120
+params:            # editable on the Sim Lab page; substituted into the command
+  noise_model: mixed   # gaussian | drift | scale | outliers | mixed — each is a different failure mode
+  noise: 0.05          # gaussian: white position noise per pose (m)
+  drift: 0.002         # drift: heading error accumulated per step (rad)
+  scale_err: 0.02      # scale: relative step-length error (monocular scale drift)
+  outlier_rate: 0.01   # outliers: fraction of steps with a 10x jump (bad matches)
+  seed: 7
+  steps: 400
+  shape: lemniscate
+  rate: 40             # steps per second (0 = as fast as possible); 40 lets you watch it live
+  dropout_rate: 0.0    # sensor dropout: chance per step that a window of missing estimate poses starts
+  dropout_len: 15      # sensor dropout: window length in steps
+  latency: 0           # sensor latency: estimate stamps shifted this many steps late (association suffers)
+outputs:
+  est: traj_est.tum   # TUM files the command must write into the run folder
+  gt: traj_gt.tum
+metrics: [ate, rpe]
+eval:
+  max_diff: 0.2      # timestamp association tolerance (s); wide enough that latency shows as error, not as 'no matches'
+variants:            # named parameter overlays (R-8.21); "run campaign" runs them one after another for the compare table
+  clean:        { noise_model: gaussian, noise: 0.01, drift: 0.0, rate: 0 }
+  gaussian:     { noise_model: gaussian, rate: 0 }
+  drift:        { noise_model: drift, rate: 0 }
+  scale:        { noise_model: scale, rate: 0 }
+  outliers:     { noise_model: outliers, rate: 0 }
+  mixed:        { noise_model: mixed, rate: 0 }
+  dropout:      { noise_model: gaussian, dropout_rate: 0.02, rate: 0 }
+  latency:      { noise_model: gaussian, latency: 3, rate: 0 }

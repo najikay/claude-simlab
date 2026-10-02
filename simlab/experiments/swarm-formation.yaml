@@ -1,0 +1,51 @@
+name: swarm-formation
+description: Swarm lab — N agents hold a ring formation from consensus over a lossy, delayed radio; the baseline question for comms, belief filters, floor plans, media and vehicle models.
+tags: [swarm, multi-agent, planning, comms]
+command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission formation --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief-alpha {belief_alpha} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --fix-every {fix_every} --anchors {anchors} --formation-radius {formation_radius} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+cwd: "{repo}"
+timeout_s: 1800
+params:
+  policy: rules          # rules | random — who picks each agent's behaviour each interval
+  decision_every: 10     # ticks between decisions
+  agents: 12
+  ticks: 400
+  comms: range          # range: any pair within comm_range talks | los: walls also block the link
+  layout: none           # none | pillars | rooms (four rooms with doors) | corridor | plan:office | plan:warehouse | plan:maze (simlab/plans)
+  sense_range: 3.0       # metres within which an agent senses an obstacle and steers away
+  comm_range: 20.0       # metres; 20 keeps 12 agents on a 40 m arena connected, 10 leaves islands (see the short-range variant)
+  msg_loss: 0.0          # probability a message is lost (0.3 = a third)
+  msg_latency: 0         # ticks a message takes
+  obs_noise: 0.3         # self-localisation noise sigma (m)
+  belief: exp            # exp (exponential filter) | kf (constant-velocity Kalman) | ekf (unicycle EKF: odometry + fixes + range/bearing to neighbours; see swarm-localisation.yaml)
+  kf_q: 0.5              # Kalman process noise scale
+  fuse_neighbours: 0     # 1 = fuse neighbours' fixes of this agent into its Kalman belief (swarm sensor fusion)
+  belief_alpha: 0.3      # belief filter gain
+  fix_every: 1           # ekf: a position fix every N ticks
+  anchors: 0             # ekf: agents with a fix every tick
+  formation_radius: 6.0
+  medium: air            # air | water (drag, current, acoustic links) | fog (sensing only)
+  vehicle: point         # point | unicycle | fixed-wing | quadrotor-lite
+  rate: 0                # ticks per second to emit (0 = fast; 20 = watch live)
+  seed: 7
+outputs: {}              # no trajectories to score against truth: the simulator writes metrics.json
+metrics: [formation_error, coverage, collisions, msg_loss]
+variants:
+  ideal:          { msg_loss: 0.0, msg_latency: 0, obs_noise: 0.05 }
+  lossy-comms:    { msg_loss: 0.3 }
+  delayed-comms:  { msg_latency: 5 }
+  short-range:    { comm_range: 10.0 }
+  noisy-self:     { obs_noise: 1.0 }
+  random-control: { policy: random }
+  kf-beliefs:     { belief: kf, obs_noise: 1.0 }
+  kf-fused:       { belief: kf, obs_noise: 1.0, fuse_neighbours: 1 }
+  exp-noisy:      { belief: exp, obs_noise: 1.0 }
+  ekf-ranging:    { belief: ekf, obs_noise: 1.0, fix_every: 25, anchors: 2, fuse_neighbours: 1 }
+  pillars:        { layout: pillars }
+  rooms-los:      { layout: rooms, comms: los }
+  corridor-los:   { layout: corridor, comms: los }
+  office-los:     { layout: "plan:office", comms: los }
+  maze-los:       { layout: "plan:maze", comms: los }
+  water:          { medium: water }
+  fog:            { medium: fog }
+  unicycle:       { vehicle: unicycle }
+  fixed-wing:     { vehicle: fixed-wing }

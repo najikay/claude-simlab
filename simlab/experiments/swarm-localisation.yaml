@@ -1,0 +1,44 @@
+name: swarm-localisation
+description: Cooperative localisation — agents on a coverage mission with a unicycle EKF fed by noisy odometry, a position fix only every fix_every ticks, and range + bearing to neighbours (their broadcast beliefs are the landmarks). Compares odometry alone, the naive EKF update (assumes independence; can diverge because the neighbours' beliefs were built from our own messages) and covariance intersection (consistent under unknown correlation), with and without well-localised anchor agents.
+tags: [swarm, localisation, ekf, sensor-fusion]
+command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission {mission} --policy rules --comm-range {comm_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief ekf --odom-noise {odom_noise} --fix-every {fix_every} --anchors {anchors} --fuse-neighbours {fuse_neighbours} --rb-fusion {rb_fusion} --range-noise {range_noise} --bearing-noise-deg {bearing_noise_deg} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+cwd: "{repo}"
+timeout_s: 1800
+params:
+  agents: 8
+  ticks: 300
+  mission: coverage      # coverage keeps everyone moving, so odometry drifts and ranging matters
+  comm_range: 30.0
+  msg_loss: 0.0
+  msg_latency: 0
+  obs_noise: 1.0         # position-fix noise sigma (m)
+  odom_noise: 0.3        # relative speed noise, additive turn-rate noise (rad/s)
+  fix_every: 25          # a fix only every N ticks (GPS mostly missing)
+  anchors: 0             # the first N agents get a fix every tick
+  fuse_neighbours: 1     # 1 = range + bearing to neighbours
+  rb_fusion: ci          # ci (covariance intersection) | naive (plain EKF update)
+  range_noise: 0.2
+  bearing_noise_deg: 3.0
+  medium: air            # air | water (drag, current, acoustic links) | fog (sensing only)
+  vehicle: point         # point | unicycle | fixed-wing | quadrotor-lite
+  rate: 0
+  seed: 7
+outputs: {}
+metrics: [belief_error, connected_pct, mean_lambda2]
+variants:
+  odometry-only:   { fuse_neighbours: 0 }
+  naive-fusion:    { rb_fusion: naive }
+  ci-fusion:       { rb_fusion: ci }
+  anchors2-naive:  { anchors: 2, rb_fusion: naive }
+  anchors2-ci:     { anchors: 2, rb_fusion: ci }
+  anchors2-alone:  { anchors: 2, fuse_neighbours: 0 }
+  lossy-links:     { anchors: 2, msg_loss: 0.5 }
+  water:          { medium: water }
+  fog:            { medium: fog }
+  unicycle:       { vehicle: unicycle }
+  fixed-wing:     { vehicle: fixed-wing }
+notes: |
+  Belief error is the metric. Expect: odometry-only worst without anchors; naive fusion can beat CI on
+  some seeds and diverge on others (correlated errors); CI is never the best and never diverges; with
+  two anchors every fused variant beats odometry alone. Repeat over seeds (tune with seeds) before
+  believing a difference. Background: docs/WORLDS.md (cooperative localisation).

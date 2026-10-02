@@ -1,0 +1,45 @@
+name: swarm-coverage
+description: Swarm lab — cover an arena with N agents that only know what their neighbours told them; compare comms conditions and decision policies on coverage, collisions and messages.
+tags: [swarm, multi-agent, coverage, comms]
+command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission coverage --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --coverage-cells {coverage_cells} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+cwd: "{repo}"
+timeout_s: 1800
+params:
+  agents: 10
+  ticks: 500
+  policy: rules
+  decision_every: 10
+  comms: range          # range: any pair within comm_range talks | los: walls also block the link
+  layout: none           # none | pillars | rooms (four rooms with doors) | corridor | plan:office | plan:warehouse | plan:maze (simlab/plans)
+  sense_range: 3.0       # metres within which an agent senses an obstacle and steers away
+  comm_range: 12.0
+  msg_loss: 0.0
+  msg_latency: 0
+  obs_noise: 0.3
+  belief: exp
+  kf_q: 0.5
+  fuse_neighbours: 0
+  coverage_cells: 10
+  medium: air            # air | water (drag, current, acoustic links) | fog (sensing only)
+  vehicle: point         # point | unicycle | fixed-wing | quadrotor-lite
+  rate: 0
+  seed: 7
+outputs: {}
+metrics: [coverage, collisions, msg_loss]
+variants:
+  ideal:          { msg_loss: 0.0, obs_noise: 0.05 }
+  lossy-comms:    { msg_loss: 0.5 }
+  short-range:    { comm_range: 6.0 }
+  random-control: { policy: random }
+  kf-beliefs:     { belief: kf, obs_noise: 1.0 }
+  kf-fused:       { belief: kf, obs_noise: 1.0, fuse_neighbours: 1 }
+  exp-noisy:      { belief: exp, obs_noise: 1.0 }
+  pillars:        { layout: pillars }
+  rooms-los:      { layout: rooms, comms: los }
+  corridor-los:   { layout: corridor, comms: los }
+  office-los:     { layout: "plan:office", comms: los }
+  maze-los:       { layout: "plan:maze", comms: los }
+  water:          { medium: water }
+  fog:            { medium: fog }
+  unicycle:       { vehicle: unicycle }
+  fixed-wing:     { vehicle: fixed-wing }

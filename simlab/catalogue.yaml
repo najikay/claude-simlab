@@ -1,0 +1,386 @@
+# Sim Lab world catalogue: what each world simulates and does not, every knob with its unit and
+# range, the metrics it writes, and example questions with the variant sets that answer them.
+# The MCP server serves this to Claude; the skills quote it. Edit this file when a world changes.
+
+worlds:
+- id: swarm
+  experiments:
+  - swarm-formation
+  - swarm-coverage
+  - swarm-localisation
+  command: simlab/worlds/swarm/sim.py
+  kind: self-scored
+  what: 'N point agents in a 2-D square arena, discrete ticks. Range-limited radio links with message loss and latency;
+    each agent acts on beliefs (its own noisy fix, filtered) and on what neighbours broadcast. Behaviours: flock,
+    formation (consensus to ring slots), rendezvous, coverage (least-visited cell), goto (greedy allocation). A
+    decision policy picks the behaviour every few ticks: rules (a baseline) or random (a control).
+
+    '
+  not: 'No terrain or light: sensing is a position fix, a proximity sense for obstacles, and messages, never a camera.
+    Water and fog are presets of comparable conditions (drag, a current, slow lossy links; shrunken sensing), not
+    fluid dynamics or light transport. Obstacles stop agents (no bouncing physics) and can block radio; doors do
+    not open. Vehicle models are kinematic (turn-rate and speed limits), not dynamics. No adversaries.
+
+    '
+  knobs:
+    agents:
+      unit: count
+      range:
+      - 2
+      - 60
+      means: number of agents
+      tune: false
+    ticks:
+      unit: ticks
+      range:
+      - 50
+      - 3000
+      means: run length; dt is 0.1 s per tick
+      tune: false
+    arena:
+      unit: m
+      range:
+      - 10
+      - 200
+      means: side of the square arena
+      tune: false
+    mission:
+      values:
+      - flock
+      - formation
+      - rendezvous
+      - coverage
+      - goto
+      means: the default behaviour
+    policy:
+      values:
+      - rules
+      - random
+      means: 'who picks each agent''s behaviour every decision interval: rules (separation first, then the mission,
+        rendezvous when isolated) or random (a control)'
+    decision_every:
+      unit: ticks
+      range:
+      - 1
+      - 100
+      means: ticks between decisions
+      tune: false
+    comm_range:
+      unit: m
+      range:
+      - 2
+      - 100
+      means: radio range; 20 keeps 12 agents on 40 m connected, 10 makes islands
+    comms:
+      values:
+      - range
+      - los
+      means: 'range: any pair within comm_range talks; los: walls also block the link (line of sight)'
+    layout:
+      values:
+      - none
+      - pillars
+      - rooms
+      - corridor
+      - plan:office
+      - plan:warehouse
+      - plan:maze
+      means: 'obstacles: four round pillars; four rooms with doors at the centre; a corridor across the middle;
+        plan:<name> = an ASCII floor plan from simlab/plans (office: four rooms off a corridor; warehouse: shelving
+        aisles; maze: short sight lines); add your own .txt there (# wall, D door)'
+    sense_range:
+      unit: m
+      range:
+      - 0.5
+      - 10
+      means: distance within which an agent senses an obstacle and steers away
+    medium:
+      values:
+      - air
+      - water
+      - fog
+      means: 'air: nothing; water: 40 %/s drag, a current, acoustic links (half range, +5 ticks latency, +20 % loss);
+        fog: sensing only (obstacles seen at 40 % range, half the range/bearing measurements missed, the rest twice
+        as noisy)'
+    current:
+      unit: m/s as vx,vy
+      means: 'water: the current (default 0.3,0)'
+    vehicle:
+      values:
+      - point
+      - unicycle
+      - fixed-wing
+      - quadrotor-lite
+      means: 'how the demanded velocity becomes motion: point mass; unicycle (no sideways motion, 2 rad/s turns);
+        fixed-wing (must keep half of max_speed, 0.9 rad/s turns); quadrotor-lite (half the acceleration, slight
+        drag)'
+    msg_loss:
+      unit: probability
+      range:
+      - 0
+      - 0.9
+      means: chance a message is lost
+    msg_latency:
+      unit: ticks
+      range:
+      - 0
+      - 30
+      means: delay before a message arrives
+    obs_noise:
+      unit: m
+      range:
+      - 0
+      - 3
+      means: sigma of the agent's own position fix
+    belief:
+      values:
+      - exp
+      - kf
+      - ekf
+      means: belief filter (exponential, constant-velocity Kalman, unicycle EKF)
+    kf_q:
+      unit: '-'
+      range:
+      - 0.01
+      - 5
+      means: Kalman process-noise scale
+    fuse_neighbours:
+      values:
+      - 0
+      - 1
+      means: '1 = fuse neighbours (kf: their fixes of me; ekf: range + bearing to them)'
+    odom_noise:
+      unit: relative
+      range:
+      - 0
+      - 1
+      means: ekf odometry noise (speed relative, turn rate additive)
+    fix_every:
+      unit: ticks
+      range:
+      - 1
+      - 200
+      means: 'ekf: an own position fix only every N ticks'
+    anchors:
+      unit: count
+      range:
+      - 0
+      - 10
+      means: 'ekf: agents with a fix every tick (well-localised)'
+    rb_fusion:
+      values:
+      - ci
+      - naive
+      means: 'ekf: covariance intersection or the plain EKF update'
+    range_noise:
+      unit: m
+      range:
+      - 0
+      - 2
+      means: 'ekf: range measurement noise'
+    bearing_noise_deg:
+      unit: deg
+      range:
+      - 0
+      - 30
+      means: 'ekf: bearing measurement noise'
+    formation_radius:
+      unit: m
+      range:
+      - 1
+      - 30
+      means: ring radius for the formation mission
+    seed:
+      unit: '-'
+      range:
+      - 0
+      - 99999
+      means: random seed; repeat over seeds before believing a difference
+  higher_is_better:
+  - coverage_pct
+  - connected_pct
+  - mean_lambda2
+  - mean_neighbours
+  metrics:
+    formation_error_m: mean distance of each agent from its ring slot (lower is better)
+    consensus_error_m: spread of the swarm (rendezvous wants it small)
+    coverage_pct: cells visited at least once
+    belief_error_m: how wrong the agents' self-estimates are (the localisation question)
+    collisions: pairs closer than collision_r, summed over ticks
+    msg_loss_pct: messages lost
+    mean_neighbours: average links per agent
+    connected_pct: ticks on which the communication graph was one piece
+    mean_lambda2: algebraic connectivity averaged over the run (0 when split)
+    blocked_links_pct: pairs in radio range whose link a wall blocked (comms los)
+    obstacle_hits: times an agent ran into an obstacle and was stopped
+  questions:
+  - q: Does message loss above 30 % break the formation?
+    experiment: swarm-formation
+    metric: formation_error_m
+    variants:
+      loss0:
+        msg_loss: 0.0
+      loss30:
+        msg_loss: 0.3
+      loss60:
+        msg_loss: 0.6
+  - q: Which floor plan breaks the formation when walls block the radio?
+    experiment: swarm-formation
+    metric: formation_error_m
+    variants:
+      open:
+        layout: none
+      office:
+        layout: plan:office
+        comms: los
+      maze:
+        layout: plan:maze
+        comms: los
+  - q: How many anchors does a swarm need to localise from ranging alone?
+    experiment: swarm-localisation
+    metric: belief_error_m
+    variants:
+      a0:
+        anchors: 0
+      a1:
+        anchors: 1
+      a2:
+        anchors: 2
+      a4:
+        anchors: 4
+  - q: Does a formation still close under water, and does a Kalman belief help there?
+    experiment: swarm-formation
+    metric: formation_error_m
+    variants:
+      air:
+        medium: air
+      water-exp:
+        medium: water
+        belief: exp
+      water-kf:
+        medium: water
+        belief: kf
+  - q: Can a swarm cover four rooms when walls block radio?
+    experiment: swarm-coverage
+    metric: coverage_pct
+    variants:
+      open:
+        layout: none
+      rooms:
+        layout: rooms
+        comms: range
+      rooms-los:
+        layout: rooms
+        comms: los
+- id: synthetic-vo
+  experiments:
+  - synthetic-vo
+  command: simlab/worlds/vo/synthetic_vo.py
+  kind: trajectory
+  what: 'A synthetic camera path with typed noise (gaussian, drift, bias), dropout and latency, producing an estimate
+    and a ground truth. For testing the evaluation chain and noise models, not an algorithm.
+
+    '
+  not: No images, no real estimator; the "estimate" is the truth plus modelled error.
+  knobs:
+    noise_model:
+      values:
+      - gaussian
+      - drift
+      - scale
+      - outliers
+      - mixed
+      means: 'gaussian: white position noise; drift: heading drift; scale: step-length error; outliers: 10x jumps;
+        mixed: all of them'
+    noise:
+      unit: m
+      range:
+      - 0
+      - 1
+      means: per-pose position noise sigma
+    drift:
+      unit: rad/step
+      range:
+      - 0
+      - 0.02
+      means: heading drift per step
+    scale_err:
+      unit: relative
+      range:
+      - 0
+      - 0.2
+      means: step-length error (scale / mixed)
+    outlier_rate:
+      unit: fraction
+      range:
+      - 0
+      - 0.1
+      means: steps with a 10x jump (outliers / mixed)
+    dropout_rate:
+      unit: probability
+      range:
+      - 0
+      - 0.2
+      means: chance per step that a dropout window starts (poses missing)
+    dropout_len:
+      unit: steps
+      range:
+      - 1
+      - 100
+      means: length of a dropout window
+    latency:
+      unit: steps
+      range:
+      - 0
+      - 50
+      means: the estimate is stamped this many steps late
+    shape:
+      values:
+      - circle
+      - lemniscate
+      means: the true path
+      tune: false
+    steps:
+      unit: poses
+      range:
+      - 20
+      - 5000
+      means: path length
+      tune: false
+    rate:
+      unit: steps/s
+      range:
+      - 0
+      - 200
+      means: 0 = as fast as possible; 20 = watch it live
+      tune: false
+    seed:
+      unit: '-'
+      range:
+      - 0
+      - 99999
+      means: random seed
+      tune: false
+  metrics:
+    ate_rmse_m: absolute trajectory error after alignment
+    rpe1_rmse_m: relative pose error over 1 step
+    drift_pct: drift as a percentage of path length
+  questions:
+  - q: How does ATE grow with drift noise?
+    experiment: synthetic-vo
+    metric: ate_rmse_m
+    variants:
+      d01:
+        noise_model: drift
+        noise: 0.01
+      d05:
+        noise_model: drift
+        noise: 0.05
+      d20:
+        noise_model: drift
+        noise: 0.2
+missing:
+- doors that open or close during a run (plans are static)
+- real fluid or light models (water and fog are kinematic / sensing presets)
+- adversaries, pursuit and interception
+- cameras, lidar or terrain (the worlds here are kinematic and radio-based)
