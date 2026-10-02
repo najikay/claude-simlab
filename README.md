@@ -128,6 +128,18 @@ print(r["headline"])
 print(lab.compare([r["run_id"]]))
 ```
 
+## Evals
+
+`claude plugin eval .` runs three cases with and without the plugin (ablation): designing a one-knob sweep from a question, reading a compare table honestly, and writing a findings note. Last run (Claude Code 2.1.288, 3 runs per case, 2026-10-03):
+
+| case | with plugin | without | Δ |
+|---|---|---|---|
+| design-sweep | 1.00 | 0.00 | +1.00 |
+| read-compare | 1.00 | 0.00 | +1.00 |
+| write-findings | 1.00 | 0.00 | +1.00 |
+
+The cases do not start the MCP server (no sandbox-safe mock yet); they test what the skills teach Claude to do with the lab's output.
+
 ## Limits (honest ones)
 
 The worlds are kinematic and radio-based: no cameras, lidar or terrain; water and fog are presets (drag, a current, slow lossy links; shrunken sensing), not fluid or light models; obstacles stop agents and can block radio, doors do not open; no adversaries. The catalogue's `not` and `missing` entries say the same thing to Claude, so it will not promise what the lab cannot do. `docs/ROADMAP.md` lists what comes next.

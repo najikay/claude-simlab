@@ -8,4 +8,4 @@ First release.
 - Synthetic visual odometry world with gaussian, drift, scale, outlier and mixed error models, dropout and latency, scored by ATE/RPE.
 - The lab: experiments as YAML, runs as folders with manifest, metrics, report and figures; campaigns; direction-aware compare; grid, random and Bayesian tuning; a world catalogue; floor plans and experiments of your own under `~/.simlab`.
 - `sim-lab` MCP server (stdio, stdlib) with twelve tools.
-- Skills `simlab-run` and `simlab-findings`, three evals, tests on Linux and Windows for Python 3.10 and 3.12.
+- Skills `simlab-run` and `simlab-findings`; three evals (all 1.00 with the plugin, 0.00 without); 20 tests on Linux and Windows for Python 3.10 and 3.12.
