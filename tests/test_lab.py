@@ -148,8 +148,11 @@ def test_parameter_values_cannot_add_a_shell_command(lab):
         "json.dumps({'headline': {'n': len(sys.argv[2]), 'argc': len(sys.argv)}}))\n",
         encoding="utf-8",
     )
+    # the script path goes through a param (quoted as one word), which is also how a Windows path survives
     lab.save_experiment(
-        "echo", f"name: echo\ncommand: '{{python}} {script} {{run_dir}} {{word}}'\nparams: {{word: hi}}\n"
+        "echo",
+        "name: echo\ncommand: '{python} {script} {run_dir} {word}'\n"
+        f"params: {{word: hi, script: {json.dumps(str(script))}}}\n",
     )
     evil = f"x; touch {marker}; $(touch {marker}) | cat"
     m = lab.run("echo", {"word": evil})
