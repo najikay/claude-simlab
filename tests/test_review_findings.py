@@ -1,6 +1,7 @@
 """Regression tests for the findings of the pre-submission review."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -147,11 +148,16 @@ def test_the_real_stdio_loop(tmp_path):
         capture_output=True,
         text=True,
         timeout=60,
-        env={"SIMLAB_HOME": str(tmp_path), "PATH": "", "PYTHONIOENCODING": "utf-8"},
+        env={
+            **os.environ,
+            "SIMLAB_HOME": str(tmp_path),
+            "PYTHONIOENCODING": "utf-8",
+        },  # Windows needs SYSTEMROOT
         check=False,
     )
     lines = [json.loads(ln) for ln in r.stdout.splitlines() if ln.strip()]
     by_id = {str(m.get("id")): m for m in lines}
+    assert "1" in by_id, (r.stdout, r.stderr)
     assert by_id["1"]["result"]["protocolVersion"] == "2024-11-05"
     assert "missing argument(s): run_id" in by_id["a"]["result"]["content"][0]["text"]
     assert by_id["3"]["error"]["code"] == -32600
