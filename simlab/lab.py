@@ -419,16 +419,20 @@ class Lab:
             raise ValueError("strategy: grid | random | bayes")
         tid = f"t-{uuid.uuid4().hex[:6]}"
         trials: list[dict] = []
-        proposer = BayesProposer(space, minimize=minimize, seed=seed) if strategy == "bayes" else None
+        proposer = (
+            BayesProposer(grid, budget=min(budget, len(grid)), minimize=minimize, seed=seed)
+            if strategy == "bayes"
+            else None
+        )
         for i in range(min(budget, len(grid))):
-            point = (
-                proposer.propose([(t["point"], t["value"]) for t in trials if t["value"] is not None])
-                if proposer
-                else points[i]
-            )
+            point = proposer.next() if proposer else points[i]
+            if point is None:
+                break
             label = ", ".join(f"{k}={point[k]}" for k in keys)
             m = self.run(name, {**(params or {}), **point}, campaign=tid, label=label)
             value = (m.get("headline") or {}).get(objective)
+            if proposer:
+                proposer.tell(point, value if isinstance(value, (int, float)) else None)
             trials.append(
                 {
                     "point": point,

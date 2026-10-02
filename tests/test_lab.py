@@ -116,3 +116,24 @@ def test_run_ids_stay_ordered_when_the_clock_stalls(lab):
     lab.clock = lambda: next(times)
     a, b, c = (lab._next_stamp() for _ in range(3))
     assert a < b < c
+
+
+def test_bayes_tuning_runs_and_reports_every_trial(lab):
+    t = lab.tune(
+        "synthetic-vo",
+        "ate_rmse_m",
+        {"noise": [0.3, 0.2, 0.1, 0.02, 0.01], "drift": [0.0, 0.01]},
+        budget=5,
+        strategy="bayes",
+        params={"steps": 60, "noise_model": "mixed", "rate": 0},
+    )
+    assert t["strategy"] == "bayes" and len(t["trials"]) == 5 and t["best"]["value"] is not None
+    assert len({json.dumps(x["point"], sort_keys=True) for x in t["trials"]}) == 5, "no repeated points"
+    assert all(x["status"] == "done" for x in t["trials"])
+
+
+def test_run_stamps_are_strictly_increasing_even_when_the_clock_stalls(lab):
+    lab.clock = lambda: 1_800_000_000.0  # a frozen clock
+    a = lab.run("synthetic-vo", {"steps": 30, "rate": 0}, variant="clean")["run_id"]
+    b = lab.run("synthetic-vo", {"steps": 30, "rate": 0}, variant="clean")["run_id"]
+    assert a.split("_")[0] < b.split("_")[0] and a != b
