@@ -136,7 +136,7 @@ class Lab:
             raise ValueError(f"the YAML's name is {data.get('name')!r}, the file name is {name!r}")
         d = self.home / "experiments"
         d.mkdir(parents=True, exist_ok=True)
-        (d / f"{name}.yaml").write_text(text, encoding="utf-8")
+        (d / f"{name}.yaml").write_text(text, encoding="utf-8", newline="\n")
         return self.experiment(name)
 
     # -- runs ------------------------------------------------------------------------------------
@@ -293,9 +293,9 @@ class Lab:
         for d in reversed(self.plan_dirs()):  # the person's own plan wins, like the simulator
             f = d / f"{layout[5:]}.txt"
             if f.is_file():
-                try:
-                    return hashlib.sha256(f.read_bytes()).hexdigest()[:16]
-                except OSError:
+                try:  # hash the decoded text so CRLF and LF files agree with plans()
+                    return hashlib.sha256(f.read_text(encoding="utf-8").encode("utf-8")).hexdigest()[:16]
+                except (OSError, UnicodeDecodeError):
                     return None
         return None
 
@@ -644,7 +644,7 @@ class Lab:
             raise ValueError(f"{name!r} is a shipped plan; pick another name or pass overwrite")
         d = self.home / "plans"
         d.mkdir(parents=True, exist_ok=True)
-        (d / f"{name}.txt").write_text(text.rstrip("\n") + "\n", encoding="utf-8")
+        (d / f"{name}.txt").write_text(text.rstrip("\n") + "\n", encoding="utf-8", newline="\n")
         return next(p for p in self.plans() if p["name"] == name)
 
 
