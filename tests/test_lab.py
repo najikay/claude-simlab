@@ -165,3 +165,23 @@ def test_parameter_values_cannot_add_a_shell_command(lab):
         lab.run("synthetic-vo", {"steps": 0})
     with pytest.raises(ValueError, match="not one of"):
         lab.run("synthetic-vo", {"shape": "square"})
+
+
+def test_world_processes_do_not_inherit_secrets(lab, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-secret")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "aws-secret")
+    script = lab.home / "env.py"
+    script.write_text(
+        "import json, os, pathlib, sys\n"
+        "pathlib.Path(sys.argv[1]).joinpath('metrics.json').write_text("
+        "json.dumps({'headline': {'secrets': sum(k in os.environ for k in ('OPENAI_API_KEY', 'AWS_SECRET_ACCESS_KEY')),"
+        " 'has_path': int('PATH' in os.environ)}}))\n",
+        encoding="utf-8",
+    )
+    lab.save_experiment(
+        "env",
+        f"name: env\ncommand: '{{python}} {{script}} {{run_dir}}'\nparams: {{script: {json.dumps(str(script))}}}\n",
+    )
+    m = lab.run("env")
+    assert m["status"] == "done", m["error"]
+    assert m["headline"] == {"secrets": 0, "has_path": 1}

@@ -120,6 +120,7 @@ Seeds are explicit, the manifest records the lab, Python and NumPy versions and 
 - Nothing is sent anywhere. The plugin makes no network requests, has no telemetry and needs no account or key.
 - What is written: run folders under `~/.simlab` (or `SIMLAB_HOME`), and the experiments and plans you ask Claude to save there. Delete the folder to delete everything.
 - The server runs experiments only from the shipped YAML or from files in your lab folder. Commands are composed from the experiment's template and typed parameters, every value quoted as a single argument and run without a shell, and values are checked against the catalogue's ranges first.
+- A world process receives only the environment variables it needs (PATH, temp and home folders, Python's own) plus the lab's; keys and tokens in your environment are not passed to it.
 - `save_experiment` registers a command of your own that the lab will run on later requests, with your rights. Claude is told to save only what you asked for, shipped names cannot be replaced by accident (an explicit `overwrite` is needed), and every run's manifest records which file and plan it used, with their hashes.
 
 ## Development

@@ -226,7 +226,7 @@ class Lab:
         _write_json(run_dir / "manifest.json", m)
         t0 = time.time()
         try:
-            env = {**os.environ, "SIMLAB_PLANS": str(self.home / "plans"), "PYTHONIOENCODING": "utf-8"}
+            env = child_env(self.home / "plans")
             with (run_dir / "stdout.log").open("w", encoding="utf-8") as log:
                 r = subprocess.run(
                     argv,
@@ -649,6 +649,43 @@ class Lab:
 
 
 # -- helpers ------------------------------------------------------------------------------------------
+# What a world process gets to see: enough to find Python, its libraries and a temp folder, and the
+# lab's own variables. Nothing else from the parent (no tokens, keys or unrelated settings).
+CHILD_ENV_KEYS = (
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "SystemRoot",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "HOME",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "LANG",
+    "LC_ALL",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "VIRTUAL_ENV",
+    "CONDA_PREFIX",
+    "LD_LIBRARY_PATH",
+    "DYLD_LIBRARY_PATH",
+    "SIMLAB_HOME",
+)
+
+
+def child_env(plans_dir: Path) -> dict[str, str]:
+    """The environment of a world process: an allow-list of the parent's variables plus the lab's own."""
+    env = {k: v for k, v in os.environ.items() if k in CHILD_ENV_KEYS}
+    env["SIMLAB_PLANS"] = str(plans_dir)
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    return env
+
+
 def _lab_version() -> str:
     from simlab import __version__
 
