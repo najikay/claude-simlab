@@ -17,6 +17,11 @@ from pathlib import Path
 
 def main() -> int:
     """Write traj_gt.tum and traj_est.tum into --out."""
+    for stream in (sys.stdout, sys.stderr):  # a Windows console may not be UTF-8
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--seed", type=int, default=7)

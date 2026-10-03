@@ -822,6 +822,11 @@ def run(a: argparse.Namespace) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     """CLI."""
+    for stream in (sys.stdout, sys.stderr):  # a Windows console may not be UTF-8
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--agents", type=int, default=12)

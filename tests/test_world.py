@@ -1,4 +1,5 @@
 import json
+import os
 
 import numpy as np
 import pytest
@@ -85,7 +86,10 @@ def test_help_prints_for_both_worlds():
             [sys.executable, str(root / rel), "--help"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=60,
+            env={**os.environ, "PYTHONIOENCODING": "cp1252"},  # the worst case: a legacy Windows console
             check=False,
         )
         assert r.returncode == 0 and "--out" in r.stdout, (rel, r.stderr[-300:])
