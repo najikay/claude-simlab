@@ -1,7 +1,7 @@
 name: swarm-localisation
 description: Cooperative localisation — agents on a coverage mission with a unicycle EKF fed by noisy odometry, a position fix only every fix_every ticks, and range + bearing to neighbours (their broadcast beliefs are the landmarks). Compares odometry alone, the naive EKF update (assumes independence; can diverge because the neighbours' beliefs were built from our own messages) and covariance intersection (consistent under unknown correlation), with and without well-localised anchor agents.
 tags: [swarm, localisation, ekf, sensor-fusion]
-command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission {mission} --policy rules --layout {layout} --comms {comms} --comm-range {comm_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief ekf --odom-noise {odom_noise} --fix-every {fix_every} --anchors {anchors} --fuse-neighbours {fuse_neighbours} --rb-fusion {rb_fusion} --range-noise {range_noise} --bearing-noise-deg {bearing_noise_deg} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+command: "{python} simlab/worlds/swarm/sim.py --plans-dir {plans_dir} --out {run_dir} --agents {agents} --ticks {ticks} --mission {mission} --policy rules --layout {layout} --comms {comms} --comm-range {comm_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief ekf --odom-noise {odom_noise} --fix-every {fix_every} --anchors {anchors} --fuse-neighbours {fuse_neighbours} --rb-fusion {rb_fusion} --range-noise {range_noise} --bearing-noise-deg {bearing_noise_deg} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
 cwd: "{repo}"
 timeout_s: 600
 params:

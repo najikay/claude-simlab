@@ -143,16 +143,12 @@ def test_the_real_stdio_loop(tmp_path):
         {"jsonrpc": "2.0", "id": 6, "method": "ping"},
     ]
     r = subprocess.run(
-        [sys.executable, str(ROOT / "servers" / "simlab_server.py")],
+        [sys.executable, str(ROOT / "servers" / "simlab_server.py"), "--home", str(tmp_path)],
         input="\n".join(json.dumps(m) for m in msgs) + "\nnot json\n",
         capture_output=True,
         text=True,
         timeout=60,
-        env={
-            **os.environ,
-            "SIMLAB_HOME": str(tmp_path),
-            "PYTHONIOENCODING": "utf-8",
-        },  # Windows needs SYSTEMROOT
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},  # Windows needs SYSTEMROOT
         check=False,
     )
     lines = [json.loads(ln) for ln in r.stdout.splitlines() if ln.strip()]

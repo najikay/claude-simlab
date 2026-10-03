@@ -42,12 +42,12 @@ Or from the Claude directory: install Sim Lab, then install the two packages onc
 - **Windows**: `python3` must resolve to a real interpreter. The Microsoft Store Python provides it; a python.org install provides only `python` and `py`. Either install Python from the Store, or register the server yourself with the interpreter you have, which also works for a virtualenv anywhere:
 
   ```
-  claude mcp add sim-lab -- python "<path to the installed plugin>\servers\simlab_server.py"
+  claude mcp add sim-lab -- python "<path to the installed plugin>\servers\simlab_server.py" --home "<optional folder for runs>"
   ```
 
   (`claude plugin list` shows where the plugin was installed.)
 
-Runs are kept under `~/.simlab/runs/` (set `SIMLAB_HOME` to move them). Your own experiments and floor plans go in `~/.simlab/experiments/` and `~/.simlab/plans/`; the tools `save_experiment` and `save_plan` write there.
+Runs are kept under `~/.simlab/runs/` (to move them, register the server yourself with `--home <folder>`, as in the Windows line above). Your own experiments and floor plans go in `~/.simlab/experiments/` and `~/.simlab/plans/`; the tools `save_experiment` and `save_plan` write there.
 
 ## A session
 
@@ -118,9 +118,9 @@ Seeds are explicit, the manifest records the lab, Python and NumPy versions and 
 
 - Everything runs on your machine: the MCP server is a local process started by Claude Code; the worlds are Python scripts in this repository.
 - Nothing is sent anywhere. The plugin makes no network requests, has no telemetry and needs no account or key.
-- What is written: run folders under `~/.simlab` (or `SIMLAB_HOME`), and the experiments and plans you ask Claude to save there. Delete the folder to delete everything.
+- What is written: run folders under `~/.simlab` (or the `--home` folder), and the experiments and plans you ask Claude to save there. Delete the folder to delete everything.
 - The server runs experiments only from the shipped YAML or from files in your lab folder. Commands are composed from the experiment's template and typed parameters, every value quoted as a single argument and run without a shell, and values are checked against the catalogue's ranges first.
-- A world process receives only the environment variables it needs (PATH, temp and home folders, Python's own) plus the lab's; keys and tokens in your environment are not passed to it.
+- The plugin reads no environment variables of its own. A world process receives only an allow-list (PATH, temp and home folders, Python's own), so keys and tokens in your environment are never passed to it.
 - `save_experiment` registers a command of your own that the lab will run on later requests, with your rights. Claude is told to save only what you asked for, shipped names cannot be replaced by accident (an explicit `overwrite` is needed), and every run's manifest records which file and plan it used, with their hashes.
 
 ## Development

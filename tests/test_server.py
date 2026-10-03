@@ -6,11 +6,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_server(tmp_path, monkeypatch):
-    monkeypatch.setenv("SIMLAB_HOME", str(tmp_path / "home"))
     spec = importlib.util.spec_from_file_location("simlab_server", ROOT / "servers" / "simlab_server.py")
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(mod)
+    mod.HOME = tmp_path / "home"
     return mod
 
 

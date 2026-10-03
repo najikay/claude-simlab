@@ -19,17 +19,12 @@ import numpy as np
 
 LAYOUTS = ["none", "pillars", "rooms", "corridor"]
 PLANS_DIR = Path(__file__).resolve().parents[2] / "plans"  # the plans shipped with the lab
-PLANS_ENV = (
-    "SIMLAB_PLANS"  # extra folders with plans, os.pathsep-separated (the Lab sets it to the person's own)
-)
+EXTRA_PLAN_DIRS: list[Path] = []  # the person's own plan folders (``--plans-dir`` on the simulator)
 
 
 def plan_dirs() -> list[Path]:
     """The person's own plan folders first, then the shipped ones."""
-    import os
-
-    own = [Path(x) for x in os.environ.get(PLANS_ENV, "").split(os.pathsep) if x]
-    return [d for d in own if d.is_dir()] + [PLANS_DIR]
+    return [d for d in EXTRA_PLAN_DIRS if d.is_dir()] + [PLANS_DIR]
 
 
 WALL, DOOR = "#", "D"

@@ -48,6 +48,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import world
 from dynamics import (
     MEDIA,
     VEHICLES,
@@ -455,6 +456,8 @@ def rules_policy(view: dict) -> tuple[str, float]:
 
 def run(a: argparse.Namespace) -> dict:
     """Simulate and write the outputs."""
+    if a.plans_dir:
+        world.EXTRA_PLAN_DIRS[:] = [Path(a.plans_dir)]
     rnd = random.Random(a.seed)
     rng = np.random.default_rng(a.seed)
     out = Path(a.out)
@@ -821,6 +824,9 @@ def main() -> int:
         choices=["range", "los"],
         default="range",
         help="range: any pair within comm_range talks; los: the pair also needs line of sight (walls block radio)",
+    )
+    ap.add_argument(
+        "--plans-dir", default="", help="a folder with the person's own floor plans (plan:<name>)"
     )
     ap.add_argument(
         "--layout",

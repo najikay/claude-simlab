@@ -57,8 +57,8 @@ def _read_json(path: Path) -> Any:
 
 
 def default_home() -> Path:
-    """Where runs live: ``$SIMLAB_HOME`` or ``~/.simlab``."""
-    return Path(os.environ.get("SIMLAB_HOME") or Path.home() / ".simlab")
+    """Where runs live unless a ``home`` is given: ``~/.simlab``."""
+    return Path.home() / ".simlab"
 
 
 class Lab:
@@ -182,7 +182,12 @@ class Lab:
             raise ValueError("; ".join(out_of_range))
         run_id = re.sub(r"[^A-Za-z0-9_-]+", "-", f"{self._next_stamp()}-{uuid.uuid4().hex[:4]}_{name}")
         run_dir = self.runs_dir / run_id
-        raw = {"python": self.python, "repo": str(ROOT.parent), "run_dir": str(run_dir)}
+        raw = {
+            "python": self.python,
+            "repo": str(ROOT.parent),
+            "run_dir": str(run_dir),
+            "plans_dir": str(self.home / "plans"),
+        }
         # every value is quoted as one shell word and the command runs without a shell: a parameter
         # can never add a second command, however it was typed
         subs = {k: shlex.quote(v) for k, v in raw.items()} | {
@@ -226,7 +231,7 @@ class Lab:
         _write_json(run_dir / "manifest.json", m)
         t0 = time.time()
         try:
-            env = child_env(self.home / "plans")
+            env = child_env()
             with (run_dir / "stdout.log").open("w", encoding="utf-8") as log:
                 r = subprocess.run(
                     argv,
@@ -673,14 +678,12 @@ CHILD_ENV_KEYS = (
     "CONDA_PREFIX",
     "LD_LIBRARY_PATH",
     "DYLD_LIBRARY_PATH",
-    "SIMLAB_HOME",
 )
 
 
-def child_env(plans_dir: Path) -> dict[str, str]:
-    """The environment of a world process: an allow-list of the parent's variables plus the lab's own."""
-    env = {k: v for k, v in os.environ.items() if k in CHILD_ENV_KEYS}
-    env["SIMLAB_PLANS"] = str(plans_dir)
+def child_env() -> dict[str, str]:
+    """The environment of a world process: only the allow-listed variables above, plus UTF-8 output."""
+    env = {k: os.environ[k] for k in CHILD_ENV_KEYS if k in os.environ}
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
     return env
@@ -734,7 +737,7 @@ def validate_experiment(data: Any) -> list[str]:
         fields = []
         out.append(str(e))
     for ph in fields:
-        if ph not in ("python", "repo", "run_dir") and ph not in params:
+        if ph not in ("python", "repo", "run_dir", "plans_dir") and ph not in params:
             out.append(f"the command uses {{{ph}}} but params has no {ph}")
     for k, v in params.items():
         if not isinstance(v, (int, float, str)) or isinstance(v, bool):

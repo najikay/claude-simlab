@@ -1,7 +1,7 @@
 name: swarm-coverage
 description: Swarm lab — cover an arena with N agents that only know what their neighbours told them; compare comms conditions and decision policies on coverage, collisions and messages.
 tags: [swarm, multi-agent, coverage, comms]
-command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission coverage --arena {arena} --current {current} --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --coverage-cells {coverage_cells} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+command: "{python} simlab/worlds/swarm/sim.py --plans-dir {plans_dir} --out {run_dir} --agents {agents} --ticks {ticks} --mission coverage --arena {arena} --current {current} --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --coverage-cells {coverage_cells} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
 cwd: "{repo}"
 timeout_s: 600
 params:

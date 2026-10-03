@@ -1,7 +1,7 @@
 name: swarm-formation
 description: Swarm lab — N agents hold a ring formation from consensus over a lossy, delayed radio; the baseline question for comms, belief filters, floor plans, media and vehicle models.
 tags: [swarm, multi-agent, planning, comms]
-command: "{python} simlab/worlds/swarm/sim.py --out {run_dir} --agents {agents} --ticks {ticks} --mission formation --arena {arena} --current {current} --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief-alpha {belief_alpha} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --fix-every {fix_every} --anchors {anchors} --formation-radius {formation_radius} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+command: "{python} simlab/worlds/swarm/sim.py --plans-dir {plans_dir} --out {run_dir} --agents {agents} --ticks {ticks} --mission formation --arena {arena} --current {current} --policy {policy} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --belief-alpha {belief_alpha} --belief {belief} --kf-q {kf_q} --fuse-neighbours {fuse_neighbours} --fix-every {fix_every} --anchors {anchors} --formation-radius {formation_radius} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
 cwd: "{repo}"
 timeout_s: 600
 params:

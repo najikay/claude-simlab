@@ -42,6 +42,7 @@ else:
     IMPORT_ERROR = ""
 
 _lab: Any = None
+HOME: Path | None = None  # set from --home; default ~/.simlab
 
 
 def lab() -> Any:
@@ -49,7 +50,7 @@ def lab() -> Any:
     if IMPORT_ERROR:
         raise RuntimeError(IMPORT_ERROR)
     if _lab is None:
-        _lab = Lab(python=sys.executable)
+        _lab = Lab(home=HOME, python=sys.executable)
     return _lab
 
 
@@ -382,6 +383,13 @@ def handle(msg: Any) -> dict | None:
 
 
 def main() -> None:
+    global HOME
+    args = sys.argv[1:]
+    if len(args) == 2 and args[0] == "--home":
+        HOME = Path(args[1])
+    elif args:
+        sys.stderr.write("usage: simlab_server.py [--home DIR]\n")
+        sys.exit(2)
     for stream in (sys.stdin, sys.stdout):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
