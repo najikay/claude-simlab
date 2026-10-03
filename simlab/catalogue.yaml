@@ -282,7 +282,7 @@ worlds:
     and a ground truth. For testing the evaluation chain and noise models, not an algorithm.
 
     '
-  not: No images, no real estimator; the "estimate" is the truth plus modelled error.
+  not: No images, no real estimator; the "estimate" is the truth plus modelled error. Camera orientation is not modelled (identity quaternions); the metrics are on positions only.
   knobs:
     noise_model:
       values:

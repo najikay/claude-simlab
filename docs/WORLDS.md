@@ -32,7 +32,7 @@ Sim Lab ships two worlds. The catalogue (`simlab/catalogue.yaml`) is the authori
 
 A true camera path (`shape: circle | lemniscate`, `steps` poses) and an estimate derived from it by a chosen error model: `gaussian` white position noise (`noise`), `drift` heading drift per step (`drift`), `scale` relative step-length error (`scale_err`), `outliers` 10× jumps on a fraction of steps (`outlier_rate`), or `mixed` (all of them). `dropout_rate`/`dropout_len` remove windows of estimate poses; `latency` stamps the estimate late so association suffers. Both trajectories are written as TUM files and scored by `simlab/evaluate.py`: ATE RMSE after alignment, RPE over one step, and drift as a percentage of path length.
 
-There is no image and no estimator: this world exists to test evaluation chains, noise models and the run → metrics → compare contract with something that finishes in well under a second (`rate: 0`; a positive `rate` paces the run for a live viewer).
+Orientation is not modelled: every pose carries the identity quaternion, so where the camera points plays no part, and ATE and RPE are computed on positions only. There is no image and no estimator: this world exists to test evaluation chains, noise models and the run → metrics → compare contract with something that finishes in well under a second (`rate: 0`; a positive `rate` paces the run for a live viewer).
 
 ## Adding a world
 
