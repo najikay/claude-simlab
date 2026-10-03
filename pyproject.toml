@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Sim Lab: robotics experiments for Claude — swarms, visual odometry, floor plans; run → metrics → compare, with an MCP server."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
+license = { text = "PolyForm-Noncommercial-1.0.0" }
 authors = [{ name = "Naji Kayal" }]
 dependencies = ["numpy>=1.24", "pyyaml>=6"]
 

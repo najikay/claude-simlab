@@ -2,7 +2,7 @@
 
 # Sim Lab
 
-[![tests](https://github.com/najikay/claude-simlab/actions/workflows/tests.yml/badge.svg)](https://github.com/najikay/claude-simlab/actions/workflows/tests.yml) ![licence](https://img.shields.io/badge/licence-Apache--2.0-blue) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
+[![tests](https://github.com/najikay/claude-simlab/actions/workflows/tests.yml/badge.svg)](https://github.com/najikay/claude-simlab/actions/workflows/tests.yml) ![licence](https://img.shields.io/badge/licence-PolyForm%20Noncommercial%201.0.0-blue) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
 **A robotics simulation lab for Claude.** Ask a question about a swarm, a formation, coverage, cooperative localisation or visual odometry, and Claude designs the experiment, runs it on your machine, compares the runs and answers with numbers you can reproduce.
 
@@ -162,4 +162,4 @@ The worlds are kinematic and radio-based: no cameras, lidar or terrain; water an
 
 ## Licence
 
-Apache-2.0. See `LICENSE` and `NOTICE`.
+[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0): free to use, change and share for any noncommercial purpose (personal projects, research, teaching, hobby and student work, charities and public institutions all count), with attribution. Commercial use needs a separate agreement; write to the author. See `LICENSE` and `NOTICE`.
