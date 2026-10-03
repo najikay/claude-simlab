@@ -69,6 +69,13 @@ def _layout_arg(v: str) -> str:
 
 BEHAVIOURS = ["flock", "formation", "rendezvous", "coverage", "goto"]
 
+# Extension points for a project that embeds the simulator (load this file as a module, register,
+# then call ``main()``); nothing is registered by default. A policy is called once per decision tick
+# with every agent's view and the parsed arguments, and returns one (behaviour, confidence, source)
+# per view; if it raises, that tick falls back to the rules. An argument hook adds its own flags.
+EXTRA_POLICIES: dict = {}  # name -> callable(views: list[dict], args: argparse.Namespace) -> list[tuple]
+EXTRA_ARGUMENTS: list = []  # callables(parser: argparse.ArgumentParser) -> None
+
 
 class KalmanBelief:
     """Constant-velocity Kalman filter per agent over (x, y, vx, vy) from noisy position fixes.
@@ -663,7 +670,20 @@ def run(a: argparse.Namespace) -> dict:
                 }
             )
         if tick % a.decision_every == 0:
-            if a.policy == "random":
+            if a.policy in EXTRA_POLICIES:
+                try:
+                    picks = [
+                        (str(b), float(c), str(src_)) for b, c, src_ in EXTRA_POLICIES[a.policy](views, a)
+                    ]
+                    if len(picks) != len(views) or any(b not in BEHAVIOURS for b, _, _ in picks):
+                        raise ValueError("a policy must return one known behaviour per view")
+                except Exception as e:  # noqa: BLE001 - the swarm must keep moving
+                    print(
+                        f"tick {tick}: policy {a.policy} unavailable ({str(e)[:80]}); rules for this tick",
+                        flush=True,
+                    )
+                    picks = [(*rules_policy(v), "rules-fallback") for v in views]
+            elif a.policy == "random":
                 picks = [(rnd.choice(BEHAVIOURS), 0.2, "random") for _ in views]
             else:
                 picks = [(*rules_policy(v), "rules") for v in views]
@@ -800,7 +820,7 @@ def run(a: argparse.Namespace) -> dict:
     return metrics
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
@@ -811,7 +831,7 @@ def main() -> int:
     ap.add_argument("--mission", choices=BEHAVIOURS, default="formation")
     ap.add_argument(
         "--policy",
-        choices=["rules", "random"],
+        choices=["rules", "random", *EXTRA_POLICIES],
         default="rules",
         help="who picks each agent's behaviour every decision interval: rules (separation, mission, rendezvous when isolated) or random (a control)",
     )
@@ -949,7 +969,9 @@ def main() -> int:
         help="ticks per second to emit (0 = as fast as possible); >0 paces a run for a live viewer",
     )
     ap.add_argument("--seed", type=int, default=7)
-    run(ap.parse_args())
+    for hook in EXTRA_ARGUMENTS:
+        hook(ap)
+    run(ap.parse_args(argv))
     return 0
 
 

@@ -24,6 +24,8 @@ Sim Lab ships two worlds. The catalogue (`simlab/catalogue.yaml`) is the authori
 
 **Not modelled.** Cameras, lidar, terrain, light, fluid dynamics, opening doors, adversaries. See the catalogue's `not` and `missing` entries.
 
+**Your own decision policy.** A project that embeds the simulator can add a policy without forking it: load `sim.py` as a module, put a function in `EXTRA_POLICIES` (called once per decision tick with every agent's view and the parsed arguments, returning one `(behaviour, confidence, source)` per view), optionally add flags through `EXTRA_ARGUMENTS`, then call `main()`. If the policy raises, that tick falls back to the rules and the run continues. Nothing is registered in the plugin itself.
+
 ## Synthetic visual odometry
 
 `simlab/worlds/vo/synthetic_vo.py`.

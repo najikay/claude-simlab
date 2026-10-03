@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pytest
 from conftest import load_script
@@ -47,3 +49,26 @@ def test_named_layouts_and_floor_plans(tmp_path):
     own = tmp_path / "mine.txt"
     own.write_text("###\n#.#\n###\n", encoding="utf-8")
     assert len(w.Obstacles.layout_named(f"plan:{own}", 3.0).boxes) == 4
+
+
+def test_an_embedding_project_can_register_a_policy(tmp_path):
+    sim = load_script("simlab/worlds/swarm/sim.py", "swarm_sim_ext")
+    calls = []
+
+    def always_flock(views, args):
+        calls.append((len(views), args.greeting))
+        return [("flock", 0.9, "mine") for _ in views]
+
+    def broken(views, args):
+        raise RuntimeError("down")
+
+    sim.EXTRA_POLICIES.update({"mine": always_flock, "broken": broken})
+    sim.EXTRA_ARGUMENTS.append(lambda ap: ap.add_argument("--greeting", default="hi"))
+    common = ["--agents", "4", "--ticks", "30", "--decision-every", "10"]
+    assert sim.main(["--out", str(tmp_path / "a"), "--policy", "mine", "--greeting", "yo", *common]) == 0
+    assert calls and calls[0] == (4, "yo")
+    lines = (tmp_path / "a" / "decisions.jsonl").read_text(encoding="utf-8").splitlines()
+    assert lines and all(json.loads(ln)["source"] == "mine" for ln in lines)
+    assert sim.main(["--out", str(tmp_path / "b"), "--policy", "broken", *common]) == 0
+    lines = (tmp_path / "b" / "decisions.jsonl").read_text(encoding="utf-8").splitlines()
+    assert lines and all(json.loads(ln)["source"] == "rules-fallback" for ln in lines)
