@@ -870,7 +870,7 @@ def main(argv: list[str] | None = None) -> int:
         "--medium",
         choices=MEDIA,
         default="air",
-        help="air (nothing) | water (drag, a current, acoustic links: half range, +5 ticks, +20 % loss) | fog (sensing: obstacles seen at 40 %, half the range/bearing measurements missed, the rest twice as noisy)",
+        help="air (nothing) | water (drag, a current, acoustic links: half range, +5 ticks, +20 %% loss) | fog (sensing: obstacles seen at 40 %%, half the range/bearing measurements missed, the rest twice as noisy)",
     )
     ap.add_argument("--current", default="", help="water: the current as 'vx,vy' in m/s (default 0.3,0)")
     ap.add_argument(

@@ -72,3 +72,20 @@ def test_an_embedding_project_can_register_a_policy(tmp_path):
     assert sim.main(["--out", str(tmp_path / "b"), "--policy", "broken", *common]) == 0
     lines = (tmp_path / "b" / "decisions.jsonl").read_text(encoding="utf-8").splitlines()
     assert lines and all(json.loads(ln)["source"] == "rules-fallback" for ln in lines)
+
+
+def test_help_prints_for_both_worlds():
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    for rel in ("simlab/worlds/swarm/sim.py", "simlab/worlds/vo/synthetic_vo.py"):
+        r = subprocess.run(
+            [sys.executable, str(root / rel), "--help"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        assert r.returncode == 0 and "--out" in r.stdout, (rel, r.stderr[-300:])
