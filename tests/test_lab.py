@@ -5,6 +5,8 @@ import pytest
 
 from simlab.lab import plan_problems, validate_experiment
 
+WORLDS = Path(__file__).resolve().parent / "worlds"  # tiny worlds the tests run
+
 
 def test_shipped_experiments_and_catalogue_agree(lab):
     names = [e["name"] for e in lab.experiments()]
@@ -79,11 +81,14 @@ def test_vo_run_is_evaluated_and_tune_finds_the_quiet_point(lab):
 
 
 def test_failures_are_recorded_not_raised(lab):
-    text = "name: boom\ncommand: \"{python} -c 'import sys; sys.exit(3)' {run_dir}\"\nparams: {}\n"
+    text = f"name: boom\ncommand: '{{python}} {{script}} {{run_dir}}'\nparams: {{script: {json.dumps(str(WORLDS / 'exit3.py'))}}}\n"
     lab.save_experiment("boom", text)
     m = lab.run("boom")
     assert m["status"] == "error" and "exited 3" in m["error"]
-    slow = "name: slow\ncommand: \"{python} -c 'import time; time.sleep(5)' {run_dir}\"\ntimeout_s: 1\nparams: {}\n"
+    slow = (
+        f"name: slow\ncommand: '{{python}} {{script}} {{run_dir}}'\ntimeout_s: 1\n"
+        f"params: {{script: {json.dumps(str(WORLDS / 'sleep5.py'))}}}\n"
+    )
     lab.save_experiment("slow", slow)
     assert "timed out" in lab.run("slow")["error"]
     assert validate_experiment({"name": "x", "command": "echo"}) == [
@@ -141,13 +146,7 @@ def test_run_stamps_are_strictly_increasing_even_when_the_clock_stalls(lab):
 
 def test_parameter_values_cannot_add_a_shell_command(lab):
     marker = lab.home / "pwned"
-    script = lab.home / "echo.py"
-    script.write_text(
-        "import json, pathlib, sys\n"
-        "pathlib.Path(sys.argv[1]).joinpath('metrics.json').write_text("
-        "json.dumps({'headline': {'n': len(sys.argv[2]), 'argc': len(sys.argv)}}))\n",
-        encoding="utf-8",
-    )
+    script = WORLDS / "echo_word.py"
     # the script path goes through a param (quoted as one word), which is also how a Windows path survives
     lab.save_experiment(
         "echo",
@@ -170,14 +169,7 @@ def test_parameter_values_cannot_add_a_shell_command(lab):
 def test_world_processes_do_not_inherit_secrets(lab, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-secret")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "aws-secret")
-    script = lab.home / "env.py"
-    script.write_text(
-        "import json, os, pathlib, sys\n"
-        "pathlib.Path(sys.argv[1]).joinpath('metrics.json').write_text("
-        "json.dumps({'headline': {'secrets': sum(k in os.environ for k in ('OPENAI_API_KEY', 'AWS_SECRET_ACCESS_KEY')),"
-        " 'has_path': int('PATH' in os.environ)}}))\n",
-        encoding="utf-8",
-    )
+    script = WORLDS / "env_report.py"
     lab.save_experiment(
         "env",
         f"name: env\ncommand: '{{python}} {{script}} {{run_dir}}'\nparams: {{script: {json.dumps(str(script))}}}\n",
