@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Draw the README figures from real runs (PIL only): swarm paths over the office plan, and VO estimate vs truth.
 
 python3 docs/figures/make_figures.py   # runs two quick experiments in a temporary lab home
