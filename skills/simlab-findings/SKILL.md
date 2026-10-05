@@ -1,6 +1,6 @@
 ---
 name: simlab-findings
-description: Write a Sim Lab result up as a short, reproducible findings note (question, setup, table, answer, limits) from the run ids and compare table. Use after a campaign or sweep when the user wants the result kept, shared or cited.
+description: "Write a Sim Lab result up as a short, reproducible findings note: the question, the setup, a table of runs, the answer with its number, the limits, and the call that reproduces it. Use when the user wants a campaign or a sweep kept, shared or cited (\"write this up\", \"make a findings note\"). Not for running experiments (use simlab-run), and not for results that did not come from the lab's tools."
 ---
 
 # Findings note

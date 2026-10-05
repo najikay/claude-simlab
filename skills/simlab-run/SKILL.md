@@ -1,6 +1,6 @@
 ---
 name: simlab-run
-description: Turn a robotics question into a simulation experiment with the Sim Lab tools, run it, compare the runs and answer with numbers. Use when the user asks what happens to a swarm, a formation, coverage, localisation or visual odometry under some condition (message loss, latency, noise, walls, water, fog, a vehicle model), or wants an experiment designed, tuned or reproduced.
+description: "Turn a robotics question into a simulation experiment, run it locally and answer with numbers: pick the experiment and one knob from the lab's catalogue, run a small campaign, compare the runs and say what would change the answer. Use when the user asks what happens to a swarm, a formation, coverage, localisation or visual odometry under some condition (message loss, noise, walls, fog), or wants an experiment designed, tuned or reproduced. Not for writing results up (use simlab-findings)."
 ---
 
 # Sim Lab: from a question to a finding
