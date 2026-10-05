@@ -21,5 +21,6 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "displayName": "Sim Lab",
   "icon": ".claude-plugin/icon.png",
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.mcp.json",
+  "privacyPolicyUrl": "https://github.com/najikay/claude-simlab/blob/main/PRIVACY.md"
 }

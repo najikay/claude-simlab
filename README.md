@@ -116,6 +116,8 @@ Seeds are explicit, the manifest records the lab, Python and NumPy versions and 
 
 ## Data handling
 
+The full statement is in [Privacy](PRIVACY.md). In short:
+
 - Everything runs on your machine: the MCP server is a local process started by Claude Code; the worlds are Python scripts in this repository.
 - Nothing is sent anywhere. The plugin makes no network requests, has no telemetry and needs no account or key.
 - What is written: run folders under `~/.simlab` (or the `--home` folder), and the experiments and plans you ask Claude to save there. Delete the folder to delete everything.
