@@ -15,7 +15,7 @@ Everything runs locally. No account, no network, no telemetry. Python 3.10+, `nu
 <img src="docs/figures/swarm-office.png" alt="8 agents covering the office floor plan with line-of-sight radio" width="46%">
 <img src="docs/figures/vo-drift.png" alt="synthetic visual odometry: truth vs estimate under heading drift" width="46%">
 </p>
-<p align="center"><sub>Left: <code>swarm-coverage</code> on the <code>plan:office</code> layout with walls blocking radio links. Right: <code>synthetic-vo</code> under heading drift, truth (grey) vs estimate (blue). Both drawn by <code>docs/figures/make_figures.py</code> from real runs.</sub></p>
+<p align="center"><sub>Left: <code>swarm-coverage</code> on the <code>plan:office</code> layout with walls blocking radio links. Right: <code>synthetic-vo</code> under heading drift, truth (grey) vs estimate (blue). Both drawn from real runs.</sub></p>
 
 ## What is in the box
 
@@ -128,12 +128,11 @@ The full statement is in [Privacy](PRIVACY.md). In short:
 ## Development
 
 ```
-python3 -m pip install -r requirements-dev.txt   # numpy, pyyaml, pytest, ruff, pillow (figures)
+python3 -m pip install -r requirements-dev.txt   # numpy, pyyaml, pytest, ruff
 python3 -m pytest -q                      # world, dynamics, lab, server (fake stdio)
 ruff check .
 claude plugin validate --strict .
 claude plugin eval . --runs 1             # the three skill evals under evals/
-python3 docs/figures/make_figures.py      # redraw the README figures from fresh runs
 ```
 
 Running the lab without Claude:

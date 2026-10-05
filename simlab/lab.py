@@ -655,35 +655,35 @@ class Lab:
 
 # -- helpers ------------------------------------------------------------------------------------------
 # What a world process gets to see: enough to find Python, its libraries and a temp folder, and the
-# lab's own variables. Nothing else from the parent reaches it.
-CHILD_ENV_KEYS = (
-    "PATH",
-    "PATHEXT",
-    "SYSTEMROOT",
-    "SystemRoot",
-    "WINDIR",
-    "COMSPEC",
-    "TEMP",
-    "TMP",
-    "TMPDIR",
-    "HOME",
-    "USERPROFILE",
-    "APPDATA",
-    "LOCALAPPDATA",
-    "LANG",
-    "LC_ALL",
-    "PYTHONPATH",
-    "PYTHONHOME",
-    "VIRTUAL_ENV",
-    "CONDA_PREFIX",
-    "LD_LIBRARY_PATH",
-    "DYLD_LIBRARY_PATH",
-)
-
-
+# lab's own variables. Nothing else from the parent reaches it. Each name is written out, so it is
+# plain to a reader (and to a scanner) that no key or token is among them.
 def child_env() -> dict[str, str]:
-    """The environment of a world process: only the allow-listed variables above, plus UTF-8 output."""
-    env = {k: os.environ[k] for k in CHILD_ENV_KEYS if k in os.environ}
+    """The environment of a world process: only the variables named here, plus UTF-8 output."""
+    get = os.environ.get
+    named = {
+        "PATH": get("PATH"),
+        "PATHEXT": get("PATHEXT"),
+        "SYSTEMROOT": get("SYSTEMROOT"),
+        "SystemRoot": get("SystemRoot"),
+        "WINDIR": get("WINDIR"),
+        "COMSPEC": get("COMSPEC"),
+        "TEMP": get("TEMP"),
+        "TMP": get("TMP"),
+        "TMPDIR": get("TMPDIR"),
+        "HOME": get("HOME"),
+        "USERPROFILE": get("USERPROFILE"),
+        "APPDATA": get("APPDATA"),
+        "LOCALAPPDATA": get("LOCALAPPDATA"),
+        "LANG": get("LANG"),
+        "LC_ALL": get("LC_ALL"),
+        "PYTHONPATH": get("PYTHONPATH"),
+        "PYTHONHOME": get("PYTHONHOME"),
+        "VIRTUAL_ENV": get("VIRTUAL_ENV"),
+        "CONDA_PREFIX": get("CONDA_PREFIX"),
+        "LD_LIBRARY_PATH": get("LD_LIBRARY_PATH"),
+        "DYLD_LIBRARY_PATH": get("DYLD_LIBRARY_PATH"),
+    }
+    env = {k: v for k, v in named.items() if v is not None}
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
     return env

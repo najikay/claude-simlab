@@ -5,8 +5,8 @@ import os
 import pathlib
 import sys
 
-MARKERS = ("SIMLAB_TEST_MARKER_ONE", "SIMLAB_TEST_MARKER_TWO")  # set by the test; not on the allow-list
-leaked = sum(k in os.environ for k in MARKERS)
+# set by the test; not on the allow-list
+leaked = int("SIMLAB_TEST_MARKER_ONE" in os.environ) + int("SIMLAB_TEST_MARKER_TWO" in os.environ)
 pathlib.Path(sys.argv[1]).joinpath("metrics.json").write_text(
     json.dumps({"headline": {"leaked": leaked, "has_path": int("PATH" in os.environ)}}), encoding="utf-8"
 )

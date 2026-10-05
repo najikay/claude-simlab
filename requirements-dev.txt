@@ -2,4 +2,3 @@ numpy>=1.24
 pyyaml>=6
 pytest>=8
 ruff>=0.6
-pillow>=10   # docs/figures/make_figures.py only
