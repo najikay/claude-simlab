@@ -166,9 +166,9 @@ def test_parameter_values_cannot_add_a_shell_command(lab):
         lab.run("synthetic-vo", {"shape": "square"})
 
 
-def test_world_processes_do_not_inherit_secrets(lab, monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-secret")
-    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "aws-secret")
+def test_world_processes_get_only_the_allow_listed_variables(lab, monkeypatch):
+    monkeypatch.setenv("SIMLAB_TEST_MARKER_ONE", "1")  # anything not on the allow-list must not arrive
+    monkeypatch.setenv("SIMLAB_TEST_MARKER_TWO", "2")
     script = WORLDS / "env_report.py"
     lab.save_experiment(
         "env",
@@ -176,4 +176,4 @@ def test_world_processes_do_not_inherit_secrets(lab, monkeypatch):
     )
     m = lab.run("env")
     assert m["status"] == "done", m["error"]
-    assert m["headline"] == {"secrets": 0, "has_path": 1}
+    assert m["headline"] == {"leaked": 0, "has_path": 1}

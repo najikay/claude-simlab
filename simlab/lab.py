@@ -655,7 +655,7 @@ class Lab:
 
 # -- helpers ------------------------------------------------------------------------------------------
 # What a world process gets to see: enough to find Python, its libraries and a temp folder, and the
-# lab's own variables. Nothing else from the parent (no tokens, keys or unrelated settings).
+# lab's own variables. Nothing else from the parent reaches it.
 CHILD_ENV_KEYS = (
     "PATH",
     "PATHEXT",
