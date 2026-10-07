@@ -270,17 +270,29 @@ def graph_connectivity(n: int, edges: list[tuple[int, int]]) -> tuple[int, float
 
 
 def local_lambda2(me: np.ndarray, others: list[np.ndarray], comm_range: float) -> float:
-    """λ2 of the graph an agent can see: itself and the neighbours it holds beliefs about, linked by range.
+    """λ2 of the weighted graph an agent can see: itself and the neighbours it holds beliefs about.
 
-    This is the agent's own estimate (what it knows, one tick old), not the swarm's true λ2: the
-    connectivity-aware behaviour plans on it, and the metrics report the true one.
+    Edge weight falls linearly from 1 at zero distance to 0 at ``comm_range`` (the usual proxy in
+    connectivity control, after Zavlanos and Pappas), so the estimate changes smoothly as agents move
+    instead of stepping between 0 and 2 the way the unweighted λ2 does at low degree. This is the
+    agent's own estimate (what it knows, one tick old), not the swarm's true λ2: the connectivity-aware
+    behaviour plans on it, and the metrics report the true one (unweighted, from the real links).
     """
     pts = [me, *others]
     n = len(pts)
     if n <= 1:
         return 0.0
-    edges = [(i, j) for i in range(n) for j in range(i + 1, n) if np.linalg.norm(pts[i] - pts[j]) <= comm_range]
-    return graph_connectivity(n, edges)[1]
+    L = np.zeros((n, n))
+    for i in range(n):
+        for j in range(i + 1, n):
+            w = max(0.0, 1.0 - float(np.linalg.norm(pts[i] - pts[j])) / comm_range)
+            if w > 0:
+                L[i, i] += w
+                L[j, j] += w
+                L[i, j] -= w
+                L[j, i] -= w
+    ev = np.linalg.eigvalsh(L)
+    return float(max(0.0, ev[1]))
 
 
 class Comms:

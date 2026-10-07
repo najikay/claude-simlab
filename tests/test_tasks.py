@@ -114,6 +114,9 @@ def test_message_budget_and_local_lambda2():
     tight = sim.local_lambda2(me, [np.array([3.0, 0.0]), np.array([0.0, 3.0])], 10.0)
     split = sim.local_lambda2(me, [np.array([30.0, 0.0])], 10.0)
     assert tight > 0.5 and split == 0.0
+    # smooth: one neighbour walking away lowers the estimate at every step, to zero at the range
+    vals = [sim.local_lambda2(me, [np.array([d, 0.0])], 10.0) for d in (1.0, 3.0, 5.0, 7.0, 9.0, 10.0)]
+    assert all(a > b for a, b in zip(vals[:-1], vals[1:], strict=True)) and vals[-1] == 0.0 and vals[0] > 1.5
 
 
 def test_the_lambda2_floor_trades_coverage_for_connectivity(tmp_path):

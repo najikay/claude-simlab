@@ -157,6 +157,21 @@ worlds:
       means: 'how the demanded velocity becomes motion: point mass; unicycle (no sideways motion, 2 rad/s turns);
         fixed-wing (must keep half of max_speed, 0.9 rad/s turns); quadrotor-lite (half the acceleration, slight
         drag)'
+    msg_budget:
+      unit: messages per tick
+      range:
+      - 0
+      - 20
+      means: how many neighbours an agent may message each tick (chosen at random); 0 = all of them. The realistic radio
+        constraint; with it, loss and latency start to matter
+    lambda2_floor:
+      unit: algebraic connectivity
+      range:
+      - 0
+      - 2
+      means: 'planning under a constraint: an agent whose planned move would drop the connectivity it can see (itself and
+        the neighbours it holds beliefs about, edge weights falling with distance to 0 at comm_range) under this floor holds
+        the mission and moves toward its neighbours instead; 0 = off. The swarm''s true lambda2 is what the metrics report'
     msg_loss:
       unit: probability
       range:
@@ -258,6 +273,7 @@ worlds:
     mean_lambda2: algebraic connectivity averaged over the run (0 when split)
     blocked_links_pct: pairs in radio range whose link a wall blocked (comms los)
     obstacle_hits: times an agent ran into an obstacle and was stopped
+    connectivity_holds_pct: agent-ticks on which the lambda2 floor overrode the mission (the price of staying connected)
     tasks_served: swarm-tasks; tasks an agent completed (higher is better)
     tasks_missed: swarm-tasks; tasks whose deadline passed unserved
     served_pct: swarm-tasks; served over all tasks that appeared (higher is better)
@@ -268,6 +284,18 @@ worlds:
     msgs_per_served_task: swarm-tasks; task messages sent per task served (the cost of coordination)
     distance_per_agent_m: swarm-tasks; mean distance each agent travelled
   questions:
+  - q: What does staying connected cost a coverage mission?
+    experiment: swarm-coverage
+    metric: coverage_pct
+    variants:
+      open:
+        layout: none
+      connected-0.1:
+        lambda2_floor: 0.1
+      connected-0.3:
+        lambda2_floor: 0.3
+      connected-0.8:
+        lambda2_floor: 0.8
   - q: Does a distributed auction beat greedy allocation when agents only know what their neighbours told them?
     experiment: swarm-tasks
     metric: served_pct

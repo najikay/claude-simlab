@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 (2026-10-07)
+
+- The connectivity estimate behind `lambda2_floor` is the λ2 of a weighted graph (edge weight falling from 1 to 0 across `comm_range`, after Zavlanos and Pappas), so it changes smoothly as agents move; in 0.2.0 it stepped between 0 and 2 at low degree and the floor's value hardly mattered.
+- The catalogue has `msg_budget`, `lambda2_floor`, `connectivity_holds_pct` and the coverage-under-a-floor question; 0.2.0 shipped the knobs without them.
+
 ## 0.2.0 (2026-10-07)
 
 Numbers you can report, and a decision to make.
