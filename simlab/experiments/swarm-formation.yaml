@@ -32,7 +32,7 @@ params:
   rate: 0                # ticks per second to emit (0 = as fast as possible); >0 paces a run for a live viewer
   seed: 7
 outputs: {}              # no trajectories to score against truth: the simulator writes metrics.json
-metrics: [connectivity_holds_pct, formation_error_m, coverage_pct, collisions, msg_loss_pct, connected_pct, mean_lambda2, belief_error_m, obstacle_hits, blocked_links_pct]
+metrics: [formation_error_m, coverage_pct, collisions, msg_loss_pct, connected_pct, mean_lambda2, belief_error_m, obstacle_hits, blocked_links_pct, connectivity_holds_pct]
 variants:
   loss0:          { msg_loss: 0.0 }
   loss30:         { msg_loss: 0.3 }

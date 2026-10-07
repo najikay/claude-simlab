@@ -29,7 +29,7 @@ params:
   rate: 0
   seed: 7
 outputs: {}
-metrics: [connectivity_holds_pct, coverage_pct, collisions, msg_loss_pct, connected_pct, mean_lambda2, belief_error_m, obstacle_hits, blocked_links_pct]
+metrics: [coverage_pct, collisions, msg_loss_pct, connected_pct, mean_lambda2, belief_error_m, obstacle_hits, blocked_links_pct, connectivity_holds_pct]
 variants:
   open:           { layout: none }
   rooms:          { layout: rooms, comms: range }
