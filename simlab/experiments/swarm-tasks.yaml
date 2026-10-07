@@ -50,3 +50,8 @@ variants:
   connected-0.1:  { lambda2_floor: 0.1 }
   connected-0.3:  { lambda2_floor: 0.3 }
   connected-0.8:  { lambda2_floor: 0.8 }
+  dense:          { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0 }   # the swarm depends on news: tasks arrive faster than one agent finds them
+  dense-greedy:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy }
+  dense-auction:  { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: auction }
+  dense-oracle:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: oracle }
+  dense-silent:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, msg_loss: 1.0 }   # no message ever arrives: each agent serves what it senses
