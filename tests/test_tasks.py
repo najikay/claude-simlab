@@ -204,3 +204,38 @@ def test_yield_gives_way_without_a_message():
     b.decide(1, pos, None, [{1: pos[1]}, {0: pos[0]}])
     assert b.claims[0] is None or b.claims[0].task != 0
     assert b.claims[1] is not None and b.claims[1].task == 0 and b.msgs_sent == 0
+
+
+def test_a_winner_s_own_message_updates_its_bid_even_when_it_rose():
+    # agent 1 wins task 0 at 1.5 m; it is then pushed away (its bid rises to 3.5); the next message from it must
+    # replace the stale 1.5 in agent 0's list, or agent 0 would never bid again on a task whose holder drifted off
+    pos = np.array([[10.0, 10.0], [14.0, 10.0]])
+    b = board("cbaa")
+    b.add_task(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
+    b.sense(0, pos)
+    b.decide(0, pos)
+    b.exchange(1, [(0, 1), (1, 0)])
+    b.decide(1, pos)
+    assert b.winners[0][0] == (1.5, 1)
+    far = np.array([[10.0, 10.0], [16.0, 10.0]])
+    b.decide(2, far)  # agent 1 refreshes its own bid to 3.5
+    assert b.winners[1][0] == (3.5, 1)
+    b.exchange(3, [(1, 0)])
+    assert b.winners[0][0] == (3.5, 1)  # agent 0 took the holder's word, although the bid is worse than its record
+    b.decide(3, far)
+    assert b.claims[0] is not None and b.claims[0].task == 0  # 2.5 m beats 3.5 m: agent 0 bids now
+
+
+def test_task_news_off_sends_nothing_but_positions_still_feed_yield():
+    pos = np.array([[10.0, 10.0], [14.0, 10.0]])
+    b = board("greedy", sense_range=2.5, task_news=False)
+    b.add_task(tasks.Task(id=0, pos=np.array([11.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
+    b.sense(0, pos)  # only agent 0 is within 2.5 m; agent 1 is 3 m away
+    b.exchange(1, [(0, 1)])
+    assert b.msgs_sent == 0 and 0 not in b.known[1]  # nothing rode the link
+    y = board("yield", task_news=False)
+    y.add_task(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
+    y.sense(0, pos)
+    y.decide(0, pos, None, [{1: pos[1]}, {0: pos[0]}])
+    y.decide(1, pos, None, [{1: pos[1]}, {0: pos[0]}])
+    assert (y.claims[0] is None or y.claims[0].task != 0) and y.claims[1] is not None  # the give-way rule still runs on positions

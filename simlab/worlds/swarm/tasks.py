@@ -137,6 +137,7 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         policy: str,
         ticks: int,
         dt: float = 0.1,
+        task_news: bool = True,
     ) -> None:
         if policy not in POLICIES and policy not in EXTRA_ALLOC:
             raise ValueError(f"alloc must be one of {POLICIES + list(EXTRA_ALLOC)}")
@@ -145,6 +146,7 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         self.rate, self.size, self.deadline = task_rate, max(1, task_size_ticks), deadline_ticks
         self.radius, self.sense_range, self.loss, self.latency = task_radius, sense_range, msg_loss, msg_latency
         self.policy, self.ticks = policy, ticks
+        self.task_news = task_news  # False: positions still travel, but no task id, claim or winner list does (the positions-only arm)
         self.tasks: list[Task] = []
         self.known: list[dict[int, int]] = [{} for _ in range(n)]  # agent -> {task id: tick heard}
         self.heard_served: list[set[int]] = [set() for _ in range(n)]
@@ -207,8 +209,8 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
     def exchange(self, tick: int, sends: list[tuple[int, int]]) -> None:
         """Task news (ids I know, ids I know are done, my claim) on every directed send of the tick
         (the same links, budget, loss and latency as the position beliefs)."""
-        if self.policy == "oracle":
-            return  # the oracle assigns from the true state and reads no message
+        if self.policy == "oracle" or not self.task_news:
+            return  # the oracle assigns from the true state and reads no message; with task_news off nothing rides the links
         for src, dst in sends:
             news = {
                 "known": list(self.known[src].keys()),
@@ -237,8 +239,8 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
                 mine = self.winners[dst]
                 for tid, (bid, who) in news["winners"].items():
                     cur = mine.get(tid)
-                    if cur is None or (bid, who) < cur:
-                        mine[tid] = (bid, who)
+                    if cur is None or (bid, who) < cur or (who == src and cur[1] == src):
+                        mine[tid] = (bid, who)  # the sender's word on its own bid is current (bids follow the agent), so it may rise
 
     # -- the decision ------------------------------------------------------------------------
     def believes_open(self, i: int, tid: int, tick: int) -> bool:

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 (2026-10-07)
+
+- `task_news` knob (`--task-news 0`): positions still travel, but no task id, done id, claim or winner list rides on them. The arm that separates what the radio does (task news, positions for the give-way rule, dispersal while exploring), which the second review of the paper asked for.
+- CBAA: a winner's own message updates its bid even when the bid rose (bids follow the agent; the max-consensus merge kept the lowest bid ever heard, so a holder that drifted off kept the task in everyone's list).
+- `swarm-tasks` catalogue: `dense-<policy>-pos` and `dense-<policy>-off` variants beside `dense-<policy>`.
+- WORLDS.md documents the tasks mission.
+
 ## 0.3.0 (2026-10-07)
 
 The task-allocation world after an independent review of the first results (model changes; numbers from 0.2.x are not comparable).

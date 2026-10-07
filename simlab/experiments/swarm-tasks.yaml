@@ -1,7 +1,7 @@
 name: swarm-tasks
 description: "Swarm lab — distributed task allocation: tasks appear in the arena with a deadline, agents learn of them by sensing and from neighbours over lossy links, and each must decide which task to go for; compare greedy, a distributed auction, the central oracle (upper bound) and random on served, missed, conflicts and messages per task."
 tags: [swarm, multi-agent, allocation, decision, comms]
-command: "{python} simlab/worlds/swarm/sim.py --plans-dir {plans_dir} --out {run_dir} --agents {agents} --ticks {ticks} --mission tasks --alloc {alloc} --arena {arena} --decision-every {decision_every} --comm-range {comm_range} --msg-budget {msg_budget} --lambda2-floor {lambda2_floor} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --task-count {task_count} --task-rate {task_rate} --task-size {task_size} --deadline {deadline} --task-radius {task_radius} --shared-map {shared_map} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+command: "{python} simlab/worlds/swarm/sim.py --plans-dir {plans_dir} --out {run_dir} --agents {agents} --ticks {ticks} --mission tasks --alloc {alloc} --arena {arena} --decision-every {decision_every} --comm-range {comm_range} --msg-budget {msg_budget} --lambda2-floor {lambda2_floor} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --task-count {task_count} --task-rate {task_rate} --task-size {task_size} --deadline {deadline} --task-radius {task_radius} --shared-map {shared_map} --task-news {task_news} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
 cwd: "{repo}"
 timeout_s: 600
 params:
@@ -25,6 +25,7 @@ params:
   deadline: 25.0         # seconds after arrival before a task is missed; 0 = no deadline
   task_radius: 1.0
   shared_map: 0           # 0: each agent explores on its own visit map (its beliefs); 1: the true shared map (the older experiments)
+  task_news: 1            # 1: messages carry task ids, done ids, claims and winner lists; 0: positions only (separates what the radio does)
   medium: air
   vehicle: point
   rate: 0
@@ -62,6 +63,21 @@ variants:
   dense-random:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: random }
   dense-oracle:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: oracle }
   dense-silent:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, msg_loss: 1.0 }   # no message ever arrives: each agent serves what it senses
+  # the three radio arms of the paper's headline: on (dense-<policy>), positions only (-pos: task news off), off (-off: no message arrives)
+  dense-greedy-pos:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy, task_news: 0 }
+  dense-greedy-off:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy, msg_loss: 1.0 }
+  dense-greedy-re-pos:    { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy-re, task_news: 0 }
+  dense-greedy-re-off:    { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy-re, msg_loss: 1.0 }
+  dense-yield-pos:        { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: yield, task_news: 0 }
+  dense-yield-off:        { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: yield, msg_loss: 1.0 }
+  dense-auction-pos:      { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: auction, task_news: 0 }
+  dense-auction-off:      { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: auction, msg_loss: 1.0 }
+  dense-cbaa-pos:         { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: cbaa, task_news: 0 }
+  dense-cbaa-off:         { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: cbaa, msg_loss: 1.0 }
+  dense-random-pos:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: random, task_news: 0 }
+  dense-random-off:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: random, msg_loss: 1.0 }
+  dense-oracle-pos:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: oracle, task_news: 0 }
+  dense-oracle-off:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: oracle, msg_loss: 1.0 }
   # the density and rate ladder for the sensitivity check (PAPER.md V5)
   lad-10-5-greedy:          { agents: 10, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 5.0, deadline: 20.0, alloc: greedy }
   lad-10-5-yield:           { agents: 10, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 5.0, deadline: 20.0, alloc: yield }

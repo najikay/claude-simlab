@@ -603,7 +603,7 @@ def run(a: argparse.Namespace) -> dict:
             task_count=getattr(a, "task_count", 6), task_rate=getattr(a, "task_rate", 0.0), task_size_ticks=max(1, int(round(getattr(a, "task_size", 2.0) / a.dt))),
             deadline_ticks=int(round(a.deadline / a.dt)) if getattr(a, "deadline", 0.0) > 0 else None, task_radius=getattr(a, "task_radius", 1.0),
             sense_range=sense_range, msg_loss=min(1.0, a.msg_loss + medium.loss_add), msg_latency=a.msg_latency + medium.latency_add,
-            policy=getattr(a, "alloc", "greedy"), ticks=a.ticks, dt=a.dt,
+            policy=getattr(a, "alloc", "greedy"), ticks=a.ticks, dt=a.dt, task_news=bool(int(getattr(a, "task_news", 1))),
         )
         if getattr(a, "mission", "formation") == "tasks"
         else None
@@ -1084,6 +1084,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--task-size", dest="task_size", type=float, default=2.0, help="seconds an agent must stay at a task to serve it")
     ap.add_argument("--deadline", type=float, default=0.0, help="seconds after arrival before a task is missed; 0 = no deadline")
     ap.add_argument("--task-radius", dest="task_radius", type=float, default=1.0, help="metres within which an agent is at a task")
+    ap.add_argument("--task-news", dest="task_news", type=int, default=1, help="1: messages carry task ids, done ids, claims and winner lists; 0: positions only (the arm that separates what the radio does)")
     ap.add_argument("--shared-map", dest="shared_map", type=int, default=1, help="1: every agent explores on the true shared visit map (the older experiments); 0: each agent keeps its own map from its own position belief")
     ap.add_argument("--seed", type=int, default=7)
     for hook in EXTRA_ARGUMENTS:
