@@ -571,7 +571,11 @@ def run(a: argparse.Namespace) -> dict:
     ring = np.linspace(0, 2 * math.pi, n, endpoint=False)
     offsets = np.stack([np.cos(ring), np.sin(ring)], axis=1) * a.formation_radius
     cells = a.coverage_cells
-    grid = np.zeros((cells, cells), dtype=int)
+    grid = np.zeros((cells, cells), dtype=int)  # the true visit map, for the coverage metric
+    shared_map = bool(getattr(a, "shared_map", 1))
+    # with shared_map 0 each agent explores on its own visit map, built from its own position belief; with 1
+    # (the default of the older experiments) every agent reads the true map, a centrally coordinated exploration
+    own_grid = None if shared_map else np.zeros((n, cells, cells), dtype=int)
     targets = rng.uniform(0.1 * arena, 0.9 * arena, size=(n, 2))
     order = list(range(n))  # greedy allocation: each agent takes the nearest free target
     assigned: list[np.ndarray | None] = [None] * n
@@ -717,6 +721,9 @@ def run(a: argparse.Namespace) -> dict:
         for i in range(n):
             c = tuple(np.clip((pos[i] / arena * cells).astype(int), 0, cells - 1))
             grid[c] += 1
+            if own_grid is not None:
+                cb = tuple(np.clip((belief[i] / arena * cells).astype(int), 0, cells - 1))
+                own_grid[i][cb] += 1
         coverage = float((grid > 0).mean())
         views = []
         for i in range(n):
@@ -736,7 +743,7 @@ def run(a: argparse.Namespace) -> dict:
             )
         if board is not None:
             if tick % a.decision_every == 0:
-                board.decide(tick, pos, a, [comms.neighbours(i, tick, a.stale_after) for i in range(n)])
+                board.decide(tick, pos if board.policy == "oracle" else belief, a, [comms.neighbours(i, tick, a.stale_after) for i in range(n)])
                 for i in range(n):
                     decisions_by_source[f"alloc:{board.policy}"] = decisions_by_source.get(f"alloc:{board.policy}", 0) + 1
                     c = board.claims[i]
@@ -773,7 +780,7 @@ def run(a: argparse.Namespace) -> dict:
         for i in range(n):
             nb = comms.neighbours(i, tick, a.stale_after)
             v = behaviour_velocity(
-                behaviour[i], i, belief[i], vel[i], nb, offsets, grid, assigned[i], arena, a.max_speed
+                behaviour[i], i, belief[i], vel[i], nb, offsets, grid if own_grid is None else own_grid[i], assigned[i], arena, a.max_speed
             )
             if getattr(a, "lambda2_floor", 0.0) > 0 and nb:
                 # planning under a constraint: if the move would drop the connectivity I can see under the
@@ -1077,6 +1084,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--task-size", dest="task_size", type=float, default=2.0, help="seconds an agent must stay at a task to serve it")
     ap.add_argument("--deadline", type=float, default=0.0, help="seconds after arrival before a task is missed; 0 = no deadline")
     ap.add_argument("--task-radius", dest="task_radius", type=float, default=1.0, help="metres within which an agent is at a task")
+    ap.add_argument("--shared-map", dest="shared_map", type=int, default=1, help="1: every agent explores on the true shared visit map (the older experiments); 0: each agent keeps its own map from its own position belief")
     ap.add_argument("--seed", type=int, default=7)
     for hook in EXTRA_ARGUMENTS:
         hook(ap)

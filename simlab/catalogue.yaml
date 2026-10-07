@@ -65,6 +65,7 @@ worlds:
     alloc:
       values:
       - greedy
+      - greedy-re
       - yield
       - auction
       - cbaa
@@ -97,6 +98,12 @@ worlds:
       - 0
       - 300
       means: 'swarm-tasks only: seconds after arrival before an unserved task is missed; 0 = no deadline'
+    shared_map:
+      values:
+      - 0
+      - 1
+      means: 'swarm-tasks only: 0 = each agent explores on its own visit map built from its position beliefs; 1 = every agent
+        reads the true shared map (the older coverage experiments; a centrally coordinated exploration)'
     task_radius:
       unit: m
       range:
@@ -264,6 +271,7 @@ worlds:
   - tasks_served
   - served_pct
   - decided_served_pct
+  - early_served_pct
   metrics:
     formation_error_m: mean distance of each agent from its ring slot (lower is better)
     consensus_error_m: spread of the swarm (rendezvous wants it small)
@@ -284,6 +292,7 @@ worlds:
     known_tasks_per_agent: swarm-tasks; open tasks an agent knew of, averaged over agents and ticks
     served_pct: swarm-tasks; served over all tasks that appeared (higher is better)
     decided_served_pct: swarm-tasks; served over the tasks that were served or missed (open ones at the end excluded; higher is better)
+    early_served_pct: swarm-tasks; served over the tasks that arrived early enough to reach a verdict before the end (no censoring by outcome; the paper's headline rate; higher is better)
     service_time_mean_s: swarm-tasks; mean seconds from a task's arrival to its service
     service_time_p90_s: swarm-tasks; the slow tail of the same
     makespan_s: swarm-tasks; when the last served task was done

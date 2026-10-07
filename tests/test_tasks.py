@@ -31,7 +31,7 @@ def test_greedy_conflicts_where_the_auction_gives_way():
     pos = np.array([[10.0, 10.0], [14.0, 10.0]])
     for policy, expect in (("greedy", 2), ("auction", 1)):
         b = board(policy)
-        b.tasks.append(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
+        b.add_task(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
         edges = [(0, 1)]
         for tick in range(4):
             b.sense(tick, pos)
@@ -44,18 +44,18 @@ def test_greedy_conflicts_where_the_auction_gives_way():
 def test_news_travels_and_is_lost_like_everything_else():
     pos = np.array([[2.0, 2.0], [30.0, 30.0]])
     b = board("greedy", sense_range=5.0)
-    b.tasks.append(tasks.Task(id=0, pos=np.array([3.0, 3.0]), size_ticks=3, arrival=0, deadline=None))
+    b.add_task(tasks.Task(id=0, pos=np.array([3.0, 3.0]), size_ticks=3, arrival=0, deadline=None))
     b.sense(0, pos)
     assert 0 in b.known[0] and 0 not in b.known[1]  # only agent 0 is close enough to see it
     b.exchange(0, [(0, 1), (1, 0)])
     assert 0 in b.known[1] and b.msgs_sent == 2  # one message each way, heard at once with no latency
     lossy = board("greedy", sense_range=5.0, msg_loss=1.0)
-    lossy.tasks.append(tasks.Task(id=0, pos=np.array([3.0, 3.0]), size_ticks=3, arrival=0, deadline=None))
+    lossy.add_task(tasks.Task(id=0, pos=np.array([3.0, 3.0]), size_ticks=3, arrival=0, deadline=None))
     lossy.sense(0, pos)
     lossy.exchange(0, [(0, 1), (1, 0)])
     assert 0 not in lossy.known[1] and lossy.msgs_lost == 2
     late = board("greedy", sense_range=5.0, msg_latency=3)
-    late.tasks.append(tasks.Task(id=0, pos=np.array([3.0, 3.0]), size_ticks=3, arrival=0, deadline=None))
+    late.add_task(tasks.Task(id=0, pos=np.array([3.0, 3.0]), size_ticks=3, arrival=0, deadline=None))
     late.sense(0, pos)
     late.exchange(0, [(0, 1), (1, 0)])
     assert 0 not in late.known[1]
@@ -69,8 +69,8 @@ def test_news_travels_and_is_lost_like_everything_else():
 def test_service_misses_and_metrics():
     pos = np.array([[10.0, 10.0], [30.0, 30.0]])
     b = board("oracle", deadline_ticks=5)
-    b.tasks.append(tasks.Task(id=0, pos=np.array([10.3, 10.0]), size_ticks=3, arrival=0, deadline=5))
-    b.tasks.append(tasks.Task(id=1, pos=np.array([20.0, 5.0]), size_ticks=3, arrival=0, deadline=5))
+    b.add_task(tasks.Task(id=0, pos=np.array([10.3, 10.0]), size_ticks=3, arrival=0, deadline=5))
+    b.add_task(tasks.Task(id=1, pos=np.array([20.0, 5.0]), size_ticks=3, arrival=0, deadline=5))
     vel = np.zeros((2, 2))
     for tick in range(8):
         b.decide(tick, pos)
@@ -152,15 +152,15 @@ def test_an_embedding_project_can_register_an_allocation_policy():
     tasks.EXTRA_ALLOC["broken"] = broken
     try:
         b = board("far")
-        b.tasks.append(tasks.Task(id=0, pos=np.array([11.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
-        b.tasks.append(tasks.Task(id=1, pos=np.array([20.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
+        b.add_task(tasks.Task(id=0, pos=np.array([11.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
+        b.add_task(tasks.Task(id=1, pos=np.array([20.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
         b.sense(0, pos)
         b.decide(0, pos)
         assert calls == [2] and b.claims[0].task == 1  # the far one, as the policy says
         v = b.views(0, pos)[0]
         assert {k["task"] for k in v["known"]} == {0, 1} and v["known"][0]["deadline_s"] is None
         bb = board("broken")
-        bb.tasks.append(tasks.Task(id=0, pos=np.array([11.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
+        bb.add_task(tasks.Task(id=0, pos=np.array([11.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
         bb.sense(0, pos)
         bb.decide(0, pos)
         assert bb.policy == "broken" and bb.claims[0].task == 0  # fell back to greedy for the tick, policy kept
@@ -173,7 +173,7 @@ def test_cbaa_resolves_conflicts_by_consensus():
     # two agents, one task: both bid, the exchange tells the farther one it lost, it gives way
     pos = np.array([[10.0, 10.0], [14.0, 10.0]])
     b = board("cbaa")
-    b.tasks.append(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
+    b.add_task(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
     b.sense(0, pos)
     b.decide(0, pos)
     assert [c.task for c in b.claims] == [0, 0]  # before any exchange both think they won
@@ -184,7 +184,7 @@ def test_cbaa_resolves_conflicts_by_consensus():
     # a chain of three with the task at the far end: the consensus reaches the first agent after two rounds
     pos3 = np.array([[0.0, 0.0], [5.0, 0.0], [10.0, 0.0]])
     b3 = board("cbaa", n=3)
-    b3.tasks.append(tasks.Task(id=0, pos=np.array([11.0, 0.0]), size_ticks=3, arrival=0, deadline=None))
+    b3.add_task(tasks.Task(id=0, pos=np.array([11.0, 0.0]), size_ticks=3, arrival=0, deadline=None))
     b3.sense(0, pos3)
     b3.decide(0, pos3)
     assert all(c is not None and c.task == 0 for c in b3.claims)
@@ -198,7 +198,7 @@ def test_cbaa_resolves_conflicts_by_consensus():
 def test_yield_gives_way_without_a_message():
     pos = np.array([[10.0, 10.0], [14.0, 10.0]])
     b = board("yield")
-    b.tasks.append(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
+    b.add_task(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
     b.sense(0, pos)
     b.decide(0, pos, None, [{1: pos[1]}, {0: pos[0]}])
     b.decide(1, pos, None, [{1: pos[1]}, {0: pos[0]}])

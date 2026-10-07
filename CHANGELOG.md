@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 (2026-10-07)
+
+The task-allocation world after an independent review of the first results (model changes; numbers from 0.2.x are not comparable).
+
+- Agents act on what they know. A task is open to an agent until it sees or hears it done or its told deadline passes; the true task status is read only by the world (sensing, serving, expiring), the oracle and the metrics. Before, every policy filtered on the true status, so all agents learned at once, arena-wide, when any task was served.
+- `shared_map`: 0 (the tasks experiment's default) gives each agent its own visit map from its own position belief for exploration; 1 keeps the true shared map the older coverage experiments used (a centrally coordinated exploration, now a disclosed choice).
+- Policies decide from their position belief, not the true position. Bids follow the agent (recomputed from the current distance every decision tick) and an agent at its task keeps it. Before, a bid was frozen at claim time, so an arriving agent could outbid a holder about to serve.
+- `greedy-re`: greedy that re-evaluates every decision tick. `random` keeps its task until done (it re-drew every decision tick before: a thrashing control).
+- `early_served_pct`: served among tasks that arrived early enough to reach a verdict before the run ended (no censoring by outcome); `early_tasks`.
+- `TaskBoard.add_task` for scripts and tests.
+
 ## 0.2.4 (2026-10-07)
 
 - No code in the repository, tests included, reads or copies the process environment any more (the test helper that checked an allow-list, and two test-side environment copies, are gone).

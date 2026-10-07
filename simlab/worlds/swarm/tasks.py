@@ -5,7 +5,8 @@ sensing it within ``sense_range`` or by hearing about it from a neighbour; task 
 over the same links as everything else, with the same loss and latency. Every ``decision_every`` ticks
 each agent picks a task by the allocation policy:
 
-``greedy``   the nearest task it knows is open (it may collide with a neighbour's choice)
+``greedy``   the nearest task it knows is open, kept until it is done or known gone
+``greedy-re`` greedy that re-evaluates every decision tick and switches to a nearer known task
 ``yield``    greedy, plus one rule and no bids: an agent drops its task when a neighbour whose position it
              holds is nearer to that task than itself (the give-way without the auction; the straw-man check)
 ``auction``  bid = distance; a claim is broadcast; an agent that hears a lower bid on its task drops it
@@ -32,7 +33,7 @@ from pathlib import Path
 
 import numpy as np
 
-POLICIES = ["greedy", "yield", "auction", "cbaa", "oracle", "random"]
+POLICIES = ["greedy", "greedy-re", "yield", "auction", "cbaa", "oracle", "random"]
 # an embedding project can add an allocation policy without forking (the workbench adds "laya"):
 # name -> callable(views, args) -> one chosen task id (or None) per view, in order. A view carries the
 # agent's id and position and the open tasks it knows (id, distance, seconds to the deadline, the best
@@ -160,6 +161,8 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         self.known_per_agent_sum = 0.0
         self.distance = np.zeros(n)
         self._next_id = 0
+        self._by_id: dict[int, Task] = {}
+        self._tick = 0
         for _ in range(task_count):
             self._spawn(0)
 
@@ -174,6 +177,14 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         )
         self._next_id += 1
         self.tasks.append(t)
+        self._by_id[t.id] = t
+        return t
+
+    def add_task(self, t: Task) -> Task:
+        """Place a task made by hand (tests, scenario scripts) on the board."""
+        self.tasks.append(t)
+        self._by_id[t.id] = t
+        self._next_id = max(self._next_id, t.id + 1)
         return t
 
     def arrive(self, tick: int) -> None:
@@ -230,9 +241,18 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
                         mine[tid] = (bid, who)
 
     # -- the decision ------------------------------------------------------------------------
-    def _open_known(self, i: int) -> list[Task]:
-        by_id = {t.id: t for t in self.tasks}
-        return [by_id[tid] for tid in self.known[i] if tid in by_id and by_id[tid].open and tid not in self.heard_served[i]]
+    def believes_open(self, i: int, tid: int, tick: int) -> bool:
+        """What agent i can tell: it knows the task, has not seen or heard it done, and its deadline (told
+        with the task) has not passed. The task's true state is not consulted: a served task an agent has
+        not heard of stays open for it until it sees so."""
+        t = self._by_id.get(tid)
+        if t is None or tid not in self.known[i] or tid in self.heard_served[i]:
+            return False
+        return t.deadline is None or tick < t.deadline
+
+    def _open_known(self, i: int, tick: int | None = None) -> list[Task]:
+        tick = self._tick if tick is None else tick
+        return [self._by_id[tid] for tid in self.known[i] if self.believes_open(i, tid, tick)]
 
     def views(self, tick: int, pos: np.ndarray) -> list[dict]:
         """What each agent knows, for an external allocation policy."""
@@ -254,6 +274,7 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         """Every agent (re)chooses a task by the policy; the oracle assigns everyone at once.
         ``known_pos``: per agent, the neighbour positions it holds (for ``yield``)."""
         self._known_pos = known_pos
+        self._tick = tick
         if self.policy in EXTRA_ALLOC:
             views = self.views(tick, pos)
             try:
@@ -263,7 +284,7 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
                 by_id = {t.id: t for t in self.tasks}
                 for i, tid in enumerate(picks):
                     t = by_id.get(tid) if tid is not None else None
-                    self.claims[i] = Claim(t.id, float(np.linalg.norm(pos[i] - t.pos)), tick) if t is not None and t.open else None
+                    self.claims[i] = Claim(t.id, float(np.linalg.norm(pos[i] - t.pos)), tick) if t is not None and self.believes_open(i, t.id, tick) else None
                 return
             except Exception as e:  # noqa: BLE001 - the swarm must keep moving
                 print(f"tick {tick}: alloc {self.policy} unavailable ({str(e)[:80]}); greedy for this decision", flush=True)
@@ -287,23 +308,29 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         for i in range(self.n):
             cur = self.claims[i]
             if cur is not None:
-                t = next((x for x in self.tasks if x.id == cur.task), None)
-                if t is None or not t.open or cur.task in self.heard_served[i]:
+                t = self._by_id.get(cur.task)
+                if t is None or not self.believes_open(i, cur.task, tick):
                     cur = None
-                elif self.policy == "auction":
-                    best = self.heard_bids[i].get(cur.task)
-                    if best is not None and (best[0], best[1]) < (cur.bid, i):
-                        cur = None  # someone nearer claimed it: give way
-                elif self.policy == "yield" and t is not None and self._known_pos:
-                    mine = float(np.linalg.norm(pos[i] - t.pos))
-                    for j, q in (self._known_pos[i] or {}).items():
-                        if (float(np.linalg.norm(q - t.pos)), j) < (mine, i):
-                            cur = None  # a neighbour I can see is nearer: give way without a word
-                            break
-            if cur is not None and self.policy != "random":
+                else:
+                    cur.bid = float(np.linalg.norm(pos[i] - t.pos))  # bids follow the agent: the current distance
+                    serving = cur.bid <= self.radius  # at the task: it keeps it whatever others say
+                    if self.policy == "auction" and not serving:
+                        best = self.heard_bids[i].get(cur.task)
+                        if best is not None and (best[0], best[1]) < (cur.bid, i):
+                            cur = None  # someone nearer claimed it: give way
+                    elif self.policy == "yield" and not serving and self._known_pos:
+                        for j, q in (self._known_pos[i] or {}).items():
+                            if (float(np.linalg.norm(q - t.pos)), j) < (cur.bid, i):
+                                cur = None  # a neighbour I can see is nearer: give way without a word
+                                break
+                    elif self.policy == "greedy-re" and not serving:
+                        nearer = min((float(np.linalg.norm(pos[i] - x.pos)) for x in self._open_known(i, tick)), default=cur.bid)
+                        if nearer < cur.bid - 1e-9:
+                            cur = None  # a nearer known task: switch
+            if cur is not None:
                 self.claims[i] = cur
                 continue
-            cands = self._open_known(i)
+            cands = self._open_known(i, tick)
             if self.policy == "yield" and self._known_pos:
                 near = self._known_pos[i] or {}
                 cands = [t for t in cands if not any((float(np.linalg.norm(q - t.pos)), j) < (float(np.linalg.norm(pos[i] - t.pos)), i) for j, q in near.items())]
@@ -325,23 +352,26 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
     def _decide_cbaa(self, tick: int, pos: np.ndarray) -> None:
         """CBAA's bid phase for every agent: drop a task someone else now wins; otherwise keep it; with no
         task, bid on the known open task where my bid beats the winning bid I know of."""
-        by_id = {t.id: t for t in self.tasks}
         for i in range(self.n):
             w = self.winners[i]
-            for tid in [t for t in w if t not in by_id or not by_id[t].open or t in self.heard_served[i]]:
-                del w[tid]  # finished or unknown tasks leave the lists
+            for tid in [t for t in w if not self.believes_open(i, t, tick)]:
+                del w[tid]  # tasks this agent believes finished leave its lists
             cur = self.claims[i]
             if cur is not None:
-                win = w.get(cur.task)
-                if win is not None and win[1] != i:
-                    cur = None  # outbid: someone else is the winner now
-                elif cur.task not in by_id or not by_id[cur.task].open:
+                if not self.believes_open(i, cur.task, tick):
                     cur = None
+                else:
+                    cur.bid = float(np.linalg.norm(pos[i] - self._by_id[cur.task].pos))  # the bid follows the agent
+                    win = w.get(cur.task)
+                    if win is None or win[1] == i or cur.bid <= self.radius:
+                        w[cur.task] = (cur.bid, i) if cur.bid <= self.radius or win is None or win[1] == i else win  # refresh my own winning bid; at the task I keep it
+                    elif (win[0], win[1]) < (cur.bid, i):
+                        cur = None  # outbid: someone else is the winner now
             if cur is not None:
                 self.claims[i] = cur
                 continue
             best_t, best_bid = None, None
-            for t in self._open_known(i):
+            for t in self._open_known(i, tick):
                 bid = float(np.linalg.norm(pos[i] - t.pos))
                 win = w.get(t.id)
                 if win is not None and not ((bid, i) < win):
@@ -358,8 +388,8 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         c = self.claims[i]
         if c is None:
             return None
-        t = next((x for x in self.tasks if x.id == c.task), None)
-        return None if t is None or not t.open else t.pos
+        t = self._by_id.get(c.task)
+        return None if t is None else t.pos
 
     # -- the service -------------------------------------------------------------------------
     def serve(self, tick: int, pos: np.ndarray, vel: np.ndarray, dt: float) -> None:
@@ -425,6 +455,13 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
             "tasks_missed": len(missed),
             "tasks_open_at_end": len(self.tasks) - len(served) - len(missed),
             "decided_served_pct": round(100 * len(served) / max(1, len(served) + len(missed)), 1),  # among tasks that reached a verdict
+            # among tasks that arrived early enough to reach a verdict before the run ended (no censoring by outcome)
+            "early_served_pct": (
+                round(100 * sum(1 for t in served if t.arrival <= self.ticks - self.deadline) / max(1, sum(1 for t in self.tasks if t.arrival <= self.ticks - self.deadline)), 1)
+                if self.deadline is not None
+                else None
+            ),
+            "early_tasks": sum(1 for t in self.tasks if self.deadline is not None and t.arrival <= self.ticks - self.deadline),
             "served_pct": round(100 * len(served) / max(1, len(self.tasks)), 1),
             "service_time_mean_s": round(float(np.mean(times)), 2) if times else None,
             "service_time_p90_s": round(float(p90), 2) if p90 is not None else None,

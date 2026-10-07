@@ -1,6 +1,6 @@
 {
   "name": "sim-lab",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "A robotics simulation lab for Claude: ask what happens to a swarm, a formation, coverage, localisation or distributed task allocation under message loss, latency, a message budget, noise, walls, water or fog, and Claude designs the experiment, runs it on your machine over seeds, compares the runs with mean and spread and answers with numbers you can reproduce.",
   "author": {
     "name": "Naji Kayal",

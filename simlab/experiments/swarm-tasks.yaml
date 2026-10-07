@@ -1,14 +1,14 @@
 name: swarm-tasks
 description: "Swarm lab — distributed task allocation: tasks appear in the arena with a deadline, agents learn of them by sensing and from neighbours over lossy links, and each must decide which task to go for; compare greedy, a distributed auction, the central oracle (upper bound) and random on served, missed, conflicts and messages per task."
 tags: [swarm, multi-agent, allocation, decision, comms]
-command: "{python} simlab/worlds/swarm/sim.py --plans-dir {plans_dir} --out {run_dir} --agents {agents} --ticks {ticks} --mission tasks --alloc {alloc} --arena {arena} --decision-every {decision_every} --comm-range {comm_range} --msg-budget {msg_budget} --lambda2-floor {lambda2_floor} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --task-count {task_count} --task-rate {task_rate} --task-size {task_size} --deadline {deadline} --task-radius {task_radius} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+command: "{python} simlab/worlds/swarm/sim.py --plans-dir {plans_dir} --out {run_dir} --agents {agents} --ticks {ticks} --mission tasks --alloc {alloc} --arena {arena} --decision-every {decision_every} --comm-range {comm_range} --msg-budget {msg_budget} --lambda2-floor {lambda2_floor} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --task-count {task_count} --task-rate {task_rate} --task-size {task_size} --deadline {deadline} --task-radius {task_radius} --shared-map {shared_map} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
 cwd: "{repo}"
 timeout_s: 600
 params:
   agents: 6
   ticks: 400
   arena: 40.0
-  alloc: greedy          # greedy | yield | auction | cbaa | oracle | random
+  alloc: greedy          # greedy | greedy-re | yield | auction | cbaa | oracle | random
   decision_every: 5
   comms: range
   layout: none
@@ -24,14 +24,16 @@ params:
   task_size: 2.0         # seconds an agent must stay at a task
   deadline: 25.0         # seconds after arrival before a task is missed; 0 = no deadline
   task_radius: 1.0
+  shared_map: 0           # 0: each agent explores on its own visit map (its beliefs); 1: the true shared map (the older experiments)
   medium: air
   vehicle: point
   rate: 0
   seed: 7
 outputs: {}
-metrics: [tasks_served, tasks_missed, tasks_open_at_end, served_pct, decided_served_pct, service_time_mean_s, service_time_p90_s, makespan_s, conflicts, msgs_per_served_task, distance_per_agent_m, msg_loss_pct, connected_pct, mean_lambda2, connectivity_holds_pct]
+metrics: [tasks_served, tasks_missed, tasks_open_at_end, served_pct, decided_served_pct, early_served_pct, service_time_mean_s, service_time_p90_s, makespan_s, conflicts, msgs_per_served_task, distance_per_agent_m, msg_loss_pct, connected_pct, mean_lambda2, connectivity_holds_pct]
 variants:
   greedy:         { alloc: greedy }
+  greedy-re:      { alloc: greedy-re }
   auction:        { alloc: auction }
   oracle:         { alloc: oracle }
   cbaa:           { alloc: cbaa }
@@ -53,6 +55,7 @@ variants:
   connected-0.8:  { lambda2_floor: 0.8 }
   dense:          { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0 }   # the swarm depends on news: tasks arrive faster than one agent finds them
   dense-greedy:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy }
+  dense-greedy-re: { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy-re }
   dense-yield:    { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: yield }
   dense-auction:  { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: auction }
   dense-cbaa:     { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: cbaa }
