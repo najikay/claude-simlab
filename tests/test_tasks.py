@@ -193,3 +193,14 @@ def test_cbaa_resolves_conflicts_by_consensus():
         b3.exchange(tick, chain)
         b3.decide(tick, pos3)
     assert [c.task if c else None for c in b3.claims] == [None, None, 0] and b3.winners[0][0] == (1.0, 2)
+
+
+def test_yield_gives_way_without_a_message():
+    pos = np.array([[10.0, 10.0], [14.0, 10.0]])
+    b = board("yield")
+    b.tasks.append(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
+    b.sense(0, pos)
+    b.decide(0, pos, None, [{1: pos[1]}, {0: pos[0]}])
+    b.decide(1, pos, None, [{1: pos[1]}, {0: pos[0]}])
+    assert b.claims[0] is None or b.claims[0].task != 0
+    assert b.claims[1] is not None and b.claims[1].task == 0 and b.msgs_sent == 0

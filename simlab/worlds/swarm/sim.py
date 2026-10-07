@@ -736,7 +736,7 @@ def run(a: argparse.Namespace) -> dict:
             )
         if board is not None:
             if tick % a.decision_every == 0:
-                board.decide(tick, pos, a)
+                board.decide(tick, pos, a, [comms.neighbours(i, tick, a.stale_after) for i in range(n)])
                 for i in range(n):
                     decisions_by_source[f"alloc:{board.policy}"] = decisions_by_source.get(f"alloc:{board.policy}", 0) + 1
                     c = board.claims[i]

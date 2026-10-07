@@ -6,6 +6,8 @@ over the same links as everything else, with the same loss and latency. Every ``
 each agent picks a task by the allocation policy:
 
 ``greedy``   the nearest task it knows is open (it may collide with a neighbour's choice)
+``yield``    greedy, plus one rule and no bids: an agent drops its task when a neighbour whose position it
+             holds is nearer to that task than itself (the give-way without the auction; the straw-man check)
 ``auction``  bid = distance; a claim is broadcast; an agent that hears a lower bid on its task drops it
              and picks again (lowest bid wins, ties by id: a one-round distributed auction)
 ``cbaa``     the consensus-based auction of Choi, Brunet and How (IEEE T-RO 2009), single-assignment:
@@ -30,7 +32,7 @@ from pathlib import Path
 
 import numpy as np
 
-POLICIES = ["greedy", "auction", "cbaa", "oracle", "random"]
+POLICIES = ["greedy", "yield", "auction", "cbaa", "oracle", "random"]
 # an embedding project can add an allocation policy without forking (the workbench adds "laya"):
 # name -> callable(views, args) -> one chosen task id (or None) per view, in order. A view carries the
 # agent's id and position and the open tasks it knows (id, distance, seconds to the deadline, the best
@@ -248,8 +250,10 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
             out.append({"id": i, "tick": tick, "x": round(float(pos[i][0]), 1), "y": round(float(pos[i][1]), 1), "claim": self.claims[i].task if self.claims[i] else None, "known": known})
         return out
 
-    def decide(self, tick: int, pos: np.ndarray, args: object | None = None) -> None:  # noqa: C901
-        """Every agent (re)chooses a task by the policy; the oracle assigns everyone at once."""
+    def decide(self, tick: int, pos: np.ndarray, args: object | None = None, known_pos: list[dict[int, np.ndarray]] | None = None) -> None:  # noqa: C901
+        """Every agent (re)chooses a task by the policy; the oracle assigns everyone at once.
+        ``known_pos``: per agent, the neighbour positions it holds (for ``yield``)."""
+        self._known_pos = known_pos
         if self.policy in EXTRA_ALLOC:
             views = self.views(tick, pos)
             try:
@@ -290,10 +294,19 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
                     best = self.heard_bids[i].get(cur.task)
                     if best is not None and (best[0], best[1]) < (cur.bid, i):
                         cur = None  # someone nearer claimed it: give way
+                elif self.policy == "yield" and t is not None and self._known_pos:
+                    mine = float(np.linalg.norm(pos[i] - t.pos))
+                    for j, q in (self._known_pos[i] or {}).items():
+                        if (float(np.linalg.norm(q - t.pos)), j) < (mine, i):
+                            cur = None  # a neighbour I can see is nearer: give way without a word
+                            break
             if cur is not None and self.policy != "random":
                 self.claims[i] = cur
                 continue
             cands = self._open_known(i)
+            if self.policy == "yield" and self._known_pos:
+                near = self._known_pos[i] or {}
+                cands = [t for t in cands if not any((float(np.linalg.norm(q - t.pos)), j) < (float(np.linalg.norm(pos[i] - t.pos)), i) for j, q in near.items())]
             if self.policy == "auction":
                 cands = [
                     t
@@ -411,6 +424,7 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
             "tasks_served": len(served),
             "tasks_missed": len(missed),
             "tasks_open_at_end": len(self.tasks) - len(served) - len(missed),
+            "decided_served_pct": round(100 * len(served) / max(1, len(served) + len(missed)), 1),  # among tasks that reached a verdict
             "served_pct": round(100 * len(served) / max(1, len(self.tasks)), 1),
             "service_time_mean_s": round(float(np.mean(times)), 2) if times else None,
             "service_time_p90_s": round(float(p90), 2) if p90 is not None else None,
