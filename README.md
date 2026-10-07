@@ -36,7 +36,7 @@ claude plugin install sim-lab@claude-simlab
 python3 -m pip install numpy pyyaml
 ```
 
-Or from the Claude directory: install Sim Lab, then install the two packages once. The server starts as `python3` and tells you (in the tool error) which interpreter it is running and what is missing.
+The server starts as `python3` and tells you (in the tool error) which interpreter it is running and what is missing.
 
 - **Debian, Ubuntu, Homebrew** refuse `pip install` into the system Python ("externally managed"). Use the distribution's packages (`sudo apt install python3-numpy python3-yaml`), or `python3 -m pip install --user --break-system-packages numpy pyyaml`, or point Claude Code at a virtualenv's interpreter (below).
 - **Windows**: `python3` must resolve to a real interpreter. The Microsoft Store Python provides it; a python.org install provides only `python` and `py`. Either install Python from the Store, or register the server yourself with the interpreter you have, which also works for a virtualenv anywhere:
