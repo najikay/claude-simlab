@@ -23,7 +23,7 @@ One page per question, from the tools' numbers only.
 | ... | ... | ... | ... |
 
 ## Reading
-<two or three sentences: the trend, the size of the effect, anything surprising; a seed re-run if one was made>
+<two or three sentences: the trend, the size of the effect against the spread (a gap inside one std is not a finding), anything surprising; with seeds, the table cells are mean ± std and n is stated once>
 
 ## Limits
 <what the world does not model that bears on this answer (from the catalogue's `not`); the knob you did not sweep>

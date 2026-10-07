@@ -21,7 +21,7 @@ Everything runs locally. No account, no network, no telemetry. Python 3.10+, `nu
 
 | Piece | What it does |
 |---|---|
-| **`sim-lab` MCP server** | 12 tools: catalogue, experiments, run, campaign, tune, runs, compare, floor plans. Stdio, stdlib JSON-RPC, no framework. |
+| **`sim-lab` MCP server** | 13 tools: catalogue, experiments, run, campaign, tune, runs, compare, floor plans. Stdio, stdlib JSON-RPC, no framework. |
 | **`simlab-run` skill** | How Claude turns a question into a one-knob sweep, estimates cost, runs, compares, checks the seed and answers. |
 | **`simlab-findings` skill** | A one-page reproducible findings note: question, setup, table, reading, limits, reproduce. |
 | **Swarm world** | N agents in a 2-D arena with range-limited lossy, delayed radio; behaviours flock, formation, rendezvous, coverage, goto; belief filters (exponential, Kalman, unicycle EKF with range-bearing fusion and covariance intersection); obstacles and ASCII floor plans that block motion and radio; water and fog presets; point, unicycle, fixed-wing and quadrotor-lite vehicle models. |
@@ -81,7 +81,8 @@ The numbers above are from real runs on this machine. Ask for "a findings note" 
 | `catalogue` | Every world: what it simulates and what it does **not**, each knob with unit and range, the metrics, which are better when higher, example questions with ready variant sets. Claude reads this first. |
 | `list_experiments`, `get_experiment` | The shipped experiments (and your own, flagged `own`), their defaults, variants and YAML. |
 | `run_experiment` | One run to completion: run id, status, headline metrics, the report. Overrides by `params` or a named `variant`; an optional `label`. |
-| `run_campaign` | Several variants of one experiment, then the compare table. |
+| `run_campaign` | Several variants of one experiment, then the compare table; with `seeds`, each variant over every seed and mean ± std per metric. |
+| `repeat` | One configuration over several seeds (default 1..5): mean, std, min, max and n per headline metric, the number to report. |
 | `tune` | Grid, random or Bayesian (GP + expected improvement) search over a parameter space for the best headline metric. |
 | `list_runs`, `get_run` | Past runs with their metrics; one run with its manifest, report and folder. |
 | `compare_runs` | A table across runs with the best run per metric, direction-aware. |
@@ -95,9 +96,10 @@ The numbers above are from real runs on this machine. Ask for "a findings note" 
 | `swarm-formation` | Does the ring close under loss, latency, noise, walls, water, fog, a vehicle model? | `formation_error_m` ↓ |
 | `swarm-coverage` | How much of the arena (or the office) gets visited, and at what collision cost? | `coverage_pct` ↑ |
 | `swarm-localisation` | Odometry alone vs naive EKF fusion vs covariance intersection, with and without anchors. | `belief_error_m` ↓ |
+| `swarm-tasks` | Who should take which task when agents only know what their neighbours told them: greedy, a distributed auction, the central oracle, random. | `served_pct` ↑, `conflicts` ↓ |
 | `synthetic-vo` | How ATE and RPE grow with each noise model, dropout and latency. | `ate_rmse_m` ↓ |
 
-Each has 8 to 19 named variants (`lossy-comms`, `office-los`, `water`, `fixed-wing`, `anchors2-ci`, `drift`, …). `docs/WORLDS.md` explains the models; the catalogue is the authoritative list of knobs.
+Each has 8 to 22 named variants (`lossy-comms`, `office-los`, `water`, `fixed-wing`, `anchors2-ci`, `drift`, `auction`, `budget-1`, `connected-0.3`, …). `docs/WORLDS.md` explains the models; the catalogue is the authoritative list of knobs.
 
 ## Reproducibility
 
@@ -148,15 +150,16 @@ print(lab.compare([r["run_id"]]))
 
 ## Evals
 
-`claude plugin eval .` runs three cases with and without the plugin (ablation): designing a one-knob sweep from a question, reading a compare table honestly, and writing a findings note. Last run (Claude Code 2.1.288, three runs per case and arm, 2026-10-03):
+`claude plugin eval .` runs four cases with and without the plugin (ablation): designing a one-knob sweep from a question, reading a compare table honestly, reading a seeded summary (which policy wins, and whether the gap is real against the spread), and writing a findings note. Last run (Claude Code 2.1.288, three runs per case and arm, 2026-10-03):
 
 | case | with plugin | without | Δ |
 |---|---|---|---|
 | design-sweep | 1.00 | 0.33 | +0.67 |
 | read-compare | 1.00 | 1.00 | 0.00 |
 | write-findings | 1.00 | 0.00 | +1.00 |
+| read-seeded (0.2.0, one run, 2026-10-07) | 1.00 | 1.00 | 0.00 |
 
-Reading a compare table is something Claude does well on its own; that case guards the skill's reading rules (direction of each metric, run ids as citations, a seed re-run before a conclusion) rather than adding capability. The cases do not start the MCP server (no sandbox-safe mock yet); they test what the skills teach Claude to do with the lab's output.
+Reading a compare table, or a seeded summary, is something Claude does well on its own; those cases guard the skill's reading rules (direction of each metric, run ids as citations, a seed re-run before a conclusion) rather than adding capability. The cases do not start the MCP server (no sandbox-safe mock yet); they test what the skills teach Claude to do with the lab's output.
 
 ## Limits (honest ones)
 

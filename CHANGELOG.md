@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 (2026-10-07)
+
+Numbers you can report, and a decision to make.
+
+- `repeat`: one configuration over several seeds (default 1..5) with mean, std, min, max and n per headline metric; `run_campaign` takes `seeds` and summarises each variant the same way. A single run is a sample; this is the number.
+- `swarm-tasks`: distributed task allocation. Tasks appear in the arena with a service time and a deadline; an agent learns of one by sensing it or hearing of it from a neighbour over the same lossy, delayed links as everything else, then picks one by `alloc`: `greedy` (nearest known), `auction` (bid by distance, a lower bid heard over the links wins, the loser picks again), `oracle` (a central optimal assignment over the true state; the upper bound; sends nothing) or `random` (the control). Metrics: served, missed, served %, service time mean and p90, makespan, conflicts (agent-ticks with two agents on one task), messages per served task, distance per agent. Fourteen variants and two catalogue questions. The Hungarian assignment is pure numpy.
+- `msg_budget`: how many neighbours an agent may message each tick (0 = all). Per-message loss is redundancy-proof when every link sends every tick; the budget is the radio constraint under which loss and latency start to matter.
+- `lambda2_floor`: planning under a constraint. An agent whose planned move would drop the algebraic connectivity of the graph it can see (itself and the neighbours it holds beliefs about) under the floor holds the mission and moves toward its neighbours; `connectivity_holds_pct` is the price. Known limit: at low degree the local estimate is a step (one neighbour in range → λ2 = 2, none → 0), so the floor's value matters little; a smoother constraint is next.
+- The task news travels on the same directed sends as the position beliefs, so one budget, loss and latency govern both.
+- 40 tests; a fourth eval case (reading a seeded summary: which policy wins and whether the gap is real).
+
 ## 0.1.0 (2026-10-03)
 
 First release, under the PolyForm Noncommercial License 1.0.0 (free for any noncommercial use; commercial use by agreement). Reviewed before submission by an independent agent; everything it found was fixed before the first push: experiment commands run without a shell with every parameter quoted (a value can never add a command), the Bayesian tuning strategy, Python 3.10 support, shipped experiments and plans protected from silent replacement, parameter values checked against the catalogue's ranges, the catalogue's example questions backed by real variants, the tuning objective and its direction checked, failed runs returned with their log, floor-plan typo rows reported instead of dropped, unreadable files in the lab folder skipped, interrupted runs marked, ties without a "best", JSON-RPC edge cases.

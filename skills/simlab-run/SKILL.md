@@ -13,11 +13,11 @@ The lab runs on the user's machine through the `sim-lab` tools. A run is a folde
 3. **Estimate before running**: a swarm run of 400 ticks with 12 agents takes a few seconds; 1000 ticks or 40 agents, tens of seconds. Keep a first campaign under about ten runs and say how long it will take.
 4. **Run**: `run_campaign` for named variants, `run_experiment` with `params` for a sweep (give each run a `label`), `tune` only when the user wants a best value of a metric (say the budget).
 5. **Compare** with `compare_runs`. Read the direction of each metric from the catalogue's `higher_is_better` before calling anything better. Report the headline metric per run in a table, the best run, and the size of the difference in the metric's unit.
-6. **Check the result is not an accident**: if two runs differ by less than you would expect from the seed, run the top two again with another `seed` before concluding.
+6. **Check the result is not an accident**: a single run is one sample. When the runs are cheap (a swarm run takes seconds), pass `seeds` to `run_campaign` (three to five) or use `repeat`, and read the summary: a difference smaller than the spread (`std`) is not a result. When runs are slow, run the top two again with another `seed` before concluding.
 7. **Answer the question in one sentence**, then the table, then what would change the answer (a knob you did not sweep, a world limit from the catalogue's `not`). Write it up with the `simlab-findings` skill when the user wants it kept.
 
 ## Rules
 - Numbers come from `metrics.json` through the tools, never from memory or from what "should" happen.
-- Say the run ids; they are the citation.
+- Say the run ids; they are the citation. With seeds, say mean ± std and n, and the campaign or repeat id.
 - When the user's folder has its own experiments (`own: true` in `list_experiments`), use theirs over the shipped one of the same name.
 - A failed run (`status: error`) is reported with its `error` and the `stdout_tail` the tools return (the world's own message), not retried blindly. A value outside the catalogue's range is refused before anything runs: pick one inside it.
