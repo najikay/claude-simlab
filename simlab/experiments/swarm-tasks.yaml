@@ -63,7 +63,7 @@ variants:
   dense-random:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: random }
   dense-oracle:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: oracle }
   dense-silent:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, msg_loss: 1.0 }   # no message ever arrives: each agent serves what it senses
-  # the three radio arms of the paper's headline: on (dense-<policy>), positions only (-pos: task news off), off (-off: no message arrives)
+  # the three radio arms of the dense scenario: on (dense-<policy>), positions only (-pos: task news off), off (-off: no message arrives)
   dense-greedy-pos:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy, task_news: 0 }
   dense-greedy-off:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy, msg_loss: 1.0 }
   dense-greedy-re-pos:    { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy-re, task_news: 0 }
@@ -78,7 +78,7 @@ variants:
   dense-random-off:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: random, msg_loss: 1.0 }
   dense-oracle-pos:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: oracle, task_news: 0 }
   dense-oracle-off:       { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: oracle, msg_loss: 1.0 }
-  # the density and rate ladder for the sensitivity check (PAPER.md V5)
+  # the density and rate ladder: agents x task rate x policy
   lad-10-5-greedy:          { agents: 10, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 5.0, deadline: 20.0, alloc: greedy }
   lad-10-5-yield:           { agents: 10, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 5.0, deadline: 20.0, alloc: yield }
   lad-10-5-cbaa:            { agents: 10, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 5.0, deadline: 20.0, alloc: cbaa }

@@ -2,14 +2,14 @@
 
 ## 0.3.1 (2026-10-07)
 
-- `task_news` knob (`--task-news 0`): positions still travel, but no task id, done id, claim or winner list rides on them. The arm that separates what the radio does (task news, positions for the give-way rule, dispersal while exploring), which the second review of the paper asked for.
+- `task_news` knob (`--task-news 0`): positions still travel, but no task id, done id, claim or winner list rides on them. The arm that separates what the radio does (task news, positions for the give-way rule, dispersal while exploring).
 - CBAA: a winner's own message updates its bid even when the bid rose (bids follow the agent; the max-consensus merge kept the lowest bid ever heard, so a holder that drifted off kept the task in everyone's list).
 - `swarm-tasks` catalogue: `dense-<policy>-pos` and `dense-<policy>-off` variants beside `dense-<policy>`.
 - WORLDS.md documents the tasks mission.
 
 ## 0.3.0 (2026-10-07)
 
-The task-allocation world after an independent review of the first results (model changes; numbers from 0.2.x are not comparable).
+The task-allocation world without true-state reads (model changes; numbers from 0.2.x are not comparable).
 
 - Agents act on what they know. A task is open to an agent until it sees or hears it done or its told deadline passes; the true task status is read only by the world (sensing, serving, expiring), the oracle and the metrics. Before, every policy filtered on the true status, so all agents learned at once, arena-wide, when any task was served.
 - `shared_map`: 0 (the tasks experiment's default) gives each agent its own visit map from its own position belief for exploration; 1 keeps the true shared map the older coverage experiments used (a centrally coordinated exploration, now a disclosed choice).
