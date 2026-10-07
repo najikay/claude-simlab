@@ -596,12 +596,12 @@ def run(a: argparse.Namespace) -> dict:
     board = (
         TaskBoard(
             n, arena, rng, rnd,
-            task_count=a.task_count, task_rate=a.task_rate, task_size_ticks=max(1, int(round(a.task_size / a.dt))),
-            deadline_ticks=int(round(a.deadline / a.dt)) if a.deadline > 0 else None, task_radius=a.task_radius,
+            task_count=getattr(a, "task_count", 6), task_rate=getattr(a, "task_rate", 0.0), task_size_ticks=max(1, int(round(getattr(a, "task_size", 2.0) / a.dt))),
+            deadline_ticks=int(round(a.deadline / a.dt)) if getattr(a, "deadline", 0.0) > 0 else None, task_radius=getattr(a, "task_radius", 1.0),
             sense_range=sense_range, msg_loss=min(1.0, a.msg_loss + medium.loss_add), msg_latency=a.msg_latency + medium.latency_add,
-            policy=a.alloc, ticks=a.ticks, dt=a.dt,
+            policy=getattr(a, "alloc", "greedy"), ticks=a.ticks, dt=a.dt,
         )
-        if a.mission == "tasks"
+        if getattr(a, "mission", "formation") == "tasks"
         else None
     )
     task_snaps: list[dict] = []
@@ -738,12 +738,12 @@ def run(a: argparse.Namespace) -> dict:
             if tick % a.decision_every == 0:
                 board.decide(tick, pos, a)
                 for i in range(n):
-                    decisions_by_source[f"alloc:{a.alloc}"] = decisions_by_source.get(f"alloc:{a.alloc}", 0) + 1
+                    decisions_by_source[f"alloc:{board.policy}"] = decisions_by_source.get(f"alloc:{board.policy}", 0) + 1
                     c = board.claims[i]
-                    f_dec.write(json.dumps({"tick": tick, "agent": i, "behaviour": "goto" if c else "coverage", "task": c.task if c else None, "confidence": 1.0, "source": f"alloc:{a.alloc}"}) + "\n")
+                    f_dec.write(json.dumps({"tick": tick, "agent": i, "behaviour": "goto" if c else "coverage", "task": c.task if c else None, "confidence": 1.0, "source": f"alloc:{board.policy}"}) + "\n")
             for i in range(n):
                 assigned[i] = board.target(i)
-                behaviour[i], conf[i], src[i] = ("goto" if assigned[i] is not None else "coverage"), 1.0, f"alloc:{a.alloc}"
+                behaviour[i], conf[i], src[i] = ("goto" if assigned[i] is not None else "coverage"), 1.0, f"alloc:{board.policy}"
         elif tick % a.decision_every == 0:
             if a.policy in EXTRA_POLICIES:
                 try:
@@ -775,11 +775,11 @@ def run(a: argparse.Namespace) -> dict:
             v = behaviour_velocity(
                 behaviour[i], i, belief[i], vel[i], nb, offsets, grid, assigned[i], arena, a.max_speed
             )
-            if a.lambda2_floor > 0 and nb:
+            if getattr(a, "lambda2_floor", 0.0) > 0 and nb:
                 # planning under a constraint: if the move would drop the connectivity I can see under the
                 # floor, hold the mission and move toward my neighbours instead (the swarm's true λ2 is measured)
                 others = list(nb.values())
-                ahead = belief[i] + v * a.dt * a.lookahead
+                ahead = belief[i] + v * a.dt * getattr(a, "lookahead", 5.0)
                 if local_lambda2(ahead, others, comms.range) < a.lambda2_floor:
                     centre = np.mean(others, axis=0)
                     pull = centre - belief[i]
