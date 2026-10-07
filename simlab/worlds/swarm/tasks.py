@@ -153,6 +153,9 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         self.msgs_lost = 0
         self.conflict_ticks = 0
         self.conflicts = 0
+        self.blind_task_ticks = 0  # open tasks known to no agent, summed over ticks (the mechanism check, V4)
+        self.open_task_ticks = 0
+        self.known_per_agent_sum = 0.0
         self.distance = np.zeros(n)
         self._next_id = 0
         for _ in range(task_count):
@@ -357,6 +360,12 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         if clash:
             self.conflict_ticks += 1
             self.conflicts += clash
+        open_ids = [t.id for t in self.tasks if t.open and t.arrival <= tick]
+        if open_ids:
+            known_any = set().union(*(set(k) for k in self.known)) if self.n else set()
+            self.open_task_ticks += len(open_ids)
+            self.blind_task_ticks += sum(1 for tid in open_ids if tid not in known_any)
+        self.known_per_agent_sum += sum(len(self._open_known(i)) for i in range(self.n)) / max(1, self.n)
         by_id = {t.id: t for t in self.tasks}
         for tid, agents in committed.items():
             t = by_id.get(tid)
@@ -408,6 +417,8 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
             "makespan_s": round(max(t.served_at for t in served) * dt, 2) if served else None,
             "conflicts": self.conflicts,
             "conflict_ticks": self.conflict_ticks,
+            "blind_pct": round(100 * self.blind_task_ticks / max(1, self.open_task_ticks), 1),
+            "known_tasks_per_agent": round(self.known_per_agent_sum / max(1, self.ticks), 2),
             "task_msgs": self.msgs_sent,
             "task_msgs_lost": self.msgs_lost,
             "msgs_per_served_task": round(self.msgs_sent / max(1, len(served)), 1),
