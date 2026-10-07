@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3 (2026-10-07)
+
+- The lab reads no environment variable at all: a world process inherits its environment the way any child process does, and UTF-8 output comes from `python -X utf8` on the command instead of two variables. (The directory's scan reads any `os.environ` access in an MCP server as "uses a credential from the user's machine", named or not.)
+- `yield`: greedy plus one rule, give way when a neighbour whose position you already hold is nearer; no bids. `cbaa`: the consensus-based auction of Choi, Brunet and How (2009), single assignment. `decided_served_pct`, `tasks_open_at_end`, `blind_pct`, `known_tasks_per_agent`. Dense and ladder variants.
+
 ## 0.2.2 (2026-10-07)
 
 - `EXTRA_ALLOC`: an embedding project can add a task-allocation policy without forking (a callable over each agent's view: its known open tasks with distance, seconds to the deadline and the best bid heard); on an error the board falls back to greedy for that decision and says so. The workbench registers `laya` this way.

@@ -1,6 +1,7 @@
 """Regression tests for the findings of the pre-submission review."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -147,10 +148,7 @@ def test_the_real_stdio_loop(tmp_path):
         capture_output=True,
         text=True,
         timeout=60,
-        env={
-            **child_env(),
-            "PYTHONIOENCODING": "utf-8",
-        },  # the allow-list keeps SYSTEMROOT, which Windows needs
+        env={**os.environ, **child_env()},  # inherit, plus the lab's own two UTF-8 settings
         check=False,
     )
     lines = [json.loads(ln) for ln in r.stdout.splitlines() if ln.strip()]

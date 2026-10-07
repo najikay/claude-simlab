@@ -215,6 +215,8 @@ class Lab:
             command = str(exp["command"]).format(**subs)
             cwd = str(exp.get("cwd") or "{repo}").format(**raw, **{k: str(v) for k, v in merged.items()})
             argv = shlex.split(command)
+            if argv[:1] == [self.python]:
+                argv[1:1] = ["-X", "utf8"]  # UTF-8 output on every platform, as a flag rather than an environment variable
         except (KeyError, ValueError) as e:
             raise ValueError(f"the command needs a parameter that is not set, or is malformed: {e}") from e
         if not argv:
@@ -249,12 +251,10 @@ class Lab:
         _write_json(run_dir / "manifest.json", m)
         t0 = time.time()
         try:
-            env = child_env()
             with (run_dir / "stdout.log").open("w", encoding="utf-8") as log:
-                r = subprocess.run(
+                r = subprocess.run(  # the child inherits the environment; UTF-8 output comes from the flags
                     argv,
                     cwd=cwd,
-                    env=env,
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     timeout=m["timeout_s"],
@@ -706,39 +706,12 @@ class Lab:
 
 
 # -- helpers ------------------------------------------------------------------------------------------
-# What a world process gets to see: enough to find Python, its libraries and a temp folder, and the
-# lab's own variables. Nothing else from the parent reaches it. Each name is written out, so it is
-# plain to a reader (and to a scanner) that no key or token is among them.
+# A world process inherits the environment the way any child process does; the lab adds only the two
+# settings that make its output UTF-8. The lab itself reads no environment variable: nothing here
+# looks at a key, a token or anything else from the user's machine, and nothing is forwarded on purpose.
 def child_env() -> dict[str, str]:
-    """The environment of a world process: only the variables named here, plus UTF-8 output."""
-    get = os.environ.get
-    named = {
-        "PATH": get("PATH"),
-        "PATHEXT": get("PATHEXT"),
-        "SYSTEMROOT": get("SYSTEMROOT"),
-        "SystemRoot": get("SystemRoot"),
-        "WINDIR": get("WINDIR"),
-        "COMSPEC": get("COMSPEC"),
-        "TEMP": get("TEMP"),
-        "TMP": get("TMP"),
-        "TMPDIR": get("TMPDIR"),
-        "HOME": get("HOME"),
-        "USERPROFILE": get("USERPROFILE"),
-        "APPDATA": get("APPDATA"),
-        "LOCALAPPDATA": get("LOCALAPPDATA"),
-        "LANG": get("LANG"),
-        "LC_ALL": get("LC_ALL"),
-        "PYTHONPATH": get("PYTHONPATH"),
-        "PYTHONHOME": get("PYTHONHOME"),
-        "VIRTUAL_ENV": get("VIRTUAL_ENV"),
-        "CONDA_PREFIX": get("CONDA_PREFIX"),
-        "LD_LIBRARY_PATH": get("LD_LIBRARY_PATH"),
-        "DYLD_LIBRARY_PATH": get("DYLD_LIBRARY_PATH"),
-    }
-    env = {k: v for k, v in named.items() if v is not None}
-    env["PYTHONIOENCODING"] = "utf-8"
-    env["PYTHONUTF8"] = "1"
-    return env
+    """The two variables the lab adds to a world process's environment (UTF-8 output)."""
+    return {"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
 
 
 def _lab_version() -> str:
