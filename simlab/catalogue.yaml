@@ -9,12 +9,15 @@ worlds:
   - swarm-formation
   - swarm-coverage
   - swarm-localisation
+  - swarm-tasks
   command: simlab/worlds/swarm/sim.py
   kind: self-scored
   what: 'N point agents in a 2-D square arena, discrete ticks. Range-limited radio links with message loss and latency;
     each agent acts on beliefs (its own noisy fix, filtered) and on what neighbours broadcast. Behaviours: flock,
-    formation (consensus to ring slots), rendezvous, coverage (least-visited cell), goto (greedy allocation). A
-    decision policy picks the behaviour every few ticks: rules (a baseline) or random (a control).
+    formation (consensus to ring slots), rendezvous, coverage (least-visited cell), goto (greedy allocation), tasks
+    (distributed task allocation: tasks with deadlines, learned by sensing and from neighbours; greedy, a one-round
+    auction, a central oracle, random). A decision policy picks the behaviour every few ticks: rules (a baseline) or
+    random (a control).
 
     '
   not: 'No terrain or light: sensing is a position fix, a proximity sense for obstacles, and messages, never a camera.
@@ -59,6 +62,45 @@ worlds:
       - random
       means: 'who picks each agent''s behaviour every decision interval: rules (separation first, then the mission,
         rendezvous when isolated) or random (a control)'
+    alloc:
+      values:
+      - greedy
+      - auction
+      - oracle
+      - random
+      means: 'swarm-tasks only: how an agent picks its task: greedy (nearest known open task), auction (bid = distance,
+        a lower bid heard over the links wins the task), oracle (a central optimal assignment from the true state, the
+        upper bound, no messages), random (a control)'
+    task_count:
+      unit: count
+      range:
+      - 0
+      - 60
+      means: 'swarm-tasks only: tasks present at the start'
+    task_rate:
+      unit: tasks per 100 ticks
+      range:
+      - 0
+      - 30
+      means: 'swarm-tasks only: average arrival rate of new tasks (Poisson); 0 = none after the start'
+    task_size:
+      unit: s
+      range:
+      - 0.1
+      - 30
+      means: 'swarm-tasks only: how long an agent must stay at a task to serve it'
+    deadline:
+      unit: s
+      range:
+      - 0
+      - 300
+      means: 'swarm-tasks only: seconds after arrival before an unserved task is missed; 0 = no deadline'
+    task_radius:
+      unit: m
+      range:
+      - 0.2
+      - 5
+      means: 'swarm-tasks only: how close counts as being at the task'
     decision_every:
       unit: ticks
       range:
@@ -202,6 +244,8 @@ worlds:
   - connected_pct
   - mean_lambda2
   - mean_neighbours
+  - tasks_served
+  - served_pct
   metrics:
     formation_error_m: mean distance of each agent from its ring slot (lower is better)
     consensus_error_m: spread of the swarm (rendezvous wants it small)
@@ -214,7 +258,41 @@ worlds:
     mean_lambda2: algebraic connectivity averaged over the run (0 when split)
     blocked_links_pct: pairs in radio range whose link a wall blocked (comms los)
     obstacle_hits: times an agent ran into an obstacle and was stopped
+    tasks_served: swarm-tasks; tasks an agent completed (higher is better)
+    tasks_missed: swarm-tasks; tasks whose deadline passed unserved
+    served_pct: swarm-tasks; served over all tasks that appeared (higher is better)
+    service_time_mean_s: swarm-tasks; mean seconds from a task's arrival to its service
+    service_time_p90_s: swarm-tasks; the slow tail of the same
+    makespan_s: swarm-tasks; when the last served task was done
+    conflicts: swarm-tasks; agent-ticks on which two or more agents were committed to the same task
+    msgs_per_served_task: swarm-tasks; task messages sent per task served (the cost of coordination)
+    distance_per_agent_m: swarm-tasks; mean distance each agent travelled
   questions:
+  - q: Does a distributed auction beat greedy allocation when agents only know what their neighbours told them?
+    experiment: swarm-tasks
+    metric: served_pct
+    variants:
+      greedy:
+        alloc: greedy
+      auction:
+        alloc: auction
+      oracle:
+        alloc: oracle
+      random-control:
+        alloc: random
+  - q: How much does the auction lose when half the messages are dropped?
+    experiment: swarm-tasks
+    metric: conflicts
+    variants:
+      auction-ideal:
+        alloc: auction
+        msg_loss: 0.0
+      auction-lossy:
+        alloc: auction
+        msg_loss: 0.5
+      greedy-lossy:
+        alloc: greedy
+        msg_loss: 0.5
   - q: Does message loss above 30 % break the formation?
     experiment: swarm-formation
     metric: formation_error_m

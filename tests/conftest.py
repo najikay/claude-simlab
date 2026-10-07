@@ -15,6 +15,7 @@ def load_script(rel: str, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[name] = mod  # dataclasses resolve postponed annotations through sys.modules
     spec.loader.exec_module(mod)
     return mod
 

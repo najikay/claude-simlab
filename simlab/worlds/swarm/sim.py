@@ -49,6 +49,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import world
+from tasks import POLICIES as ALLOC_POLICIES
+from tasks import TaskBoard
 from dynamics import (
     MEDIA,
     VEHICLES,
@@ -67,7 +69,7 @@ def _layout_arg(v: str) -> str:
     raise argparse.ArgumentTypeError(f"{v!r}: one of {LAYOUTS} or plan:<name>")
 
 
-BEHAVIOURS = ["flock", "formation", "rendezvous", "coverage", "goto"]
+BEHAVIOURS = ["flock", "formation", "rendezvous", "coverage", "goto", "tasks"]  # tasks: goto the allocated task, coverage while none is known
 
 # Extension points for a project that embeds the simulator (load this file as a module, register,
 # then call ``main()``); nothing is registered by default. A policy is called once per decision tick
@@ -545,6 +547,18 @@ def run(a: argparse.Namespace) -> dict:
         los=obstacles if getattr(a, "comms", "range") == "los" else None,
     )
     hits_total = 0
+    board = (
+        TaskBoard(
+            n, arena, rng, rnd,
+            task_count=a.task_count, task_rate=a.task_rate, task_size_ticks=max(1, int(round(a.task_size / a.dt))),
+            deadline_ticks=int(round(a.deadline / a.dt)) if a.deadline > 0 else None, task_radius=a.task_radius,
+            sense_range=sense_range, msg_loss=min(1.0, a.msg_loss + medium.loss_add), msg_latency=a.msg_latency + medium.latency_add,
+            policy=a.alloc, ticks=a.ticks,
+        )
+        if a.mission == "tasks"
+        else None
+    )
+    task_snaps: list[dict] = []
     behaviour = [a.mission] * n
     conf = [1.0] * n
     src = ["init"] * n
@@ -568,6 +582,9 @@ def run(a: argparse.Namespace) -> dict:
     collisions_total = 0
     t0 = time.time()
     for tick in range(a.ticks):
+        if board is not None:
+            board.arrive(tick)
+            board.sense(tick, pos)
         obs = pos + rng.normal(0, a.obs_noise, size=pos.shape)
         if kfs is not None:
             for i in range(n):
@@ -642,6 +659,8 @@ def run(a: argparse.Namespace) -> dict:
             belief = a.belief_alpha * obs + (1 - a.belief_alpha) * (belief + vel * a.dt)
         belief_err.append(float(np.mean(np.linalg.norm(belief - pos, axis=1))))
         comms.step(tick, pos, belief)
+        if board is not None:
+            board.exchange(tick, comms.edges)
         d = np.linalg.norm(pos[:, None, :] - pos[None, :, :], axis=2) + np.eye(n) * 1e9
         min_d = d.min(axis=1)
         collisions = int((d < a.collision_r).sum() // 2)
@@ -669,7 +688,17 @@ def run(a: argparse.Namespace) -> dict:
                     "speed": round(float(np.linalg.norm(vel[i])), 2),
                 }
             )
-        if tick % a.decision_every == 0:
+        if board is not None:
+            if tick % a.decision_every == 0:
+                board.decide(tick, pos)
+                for i in range(n):
+                    decisions_by_source[f"alloc:{a.alloc}"] = decisions_by_source.get(f"alloc:{a.alloc}", 0) + 1
+                    c = board.claims[i]
+                    f_dec.write(json.dumps({"tick": tick, "agent": i, "behaviour": "goto" if c else "coverage", "task": c.task if c else None, "confidence": 1.0, "source": f"alloc:{a.alloc}"}) + "\n")
+            for i in range(n):
+                assigned[i] = board.target(i)
+                behaviour[i], conf[i], src[i] = ("goto" if assigned[i] is not None else "coverage"), 1.0, f"alloc:{a.alloc}"
+        elif tick % a.decision_every == 0:
             if a.policy in EXTRA_POLICIES:
                 try:
                     picks = [
@@ -721,6 +750,9 @@ def run(a: argparse.Namespace) -> dict:
                     vel[i] *= 0.2  # a wall stops you
         pos = np.clip(pos, 0, arena)  # the arena edge last, so a push-out can never leave it
         hits_total += hits
+        if board is not None:
+            board.serve(tick, pos, vel, a.dt)
+            task_snaps.append(board.snapshot(tick))
         series["formation_error"].append(round(form_err, 4))
         series["consensus_error"].append(round(cons_err, 4))
         series["coverage"].append(round(coverage, 4))
@@ -800,6 +832,7 @@ def run(a: argparse.Namespace) -> dict:
             "obstacle_hits": hits_total,
         },
         "series": series,
+        "tasks": board.metrics(a.dt) if board is not None else None,
         "messages": {"sent": comms.sent, "lost": comms.lost, "range_bearing_updates": rb_updates},
         "decisions_by_source": decisions_by_source,
         "agents": n,
@@ -810,6 +843,10 @@ def run(a: argparse.Namespace) -> dict:
         "medium": medium.to_dict(),
         "vehicle": lim.model,
     }
+    if board is not None:
+        tm = board.metrics(a.dt)
+        metrics["headline"].update({k: v for k, v in tm.items() if v is not None and k not in ("conflict_ticks", "task_msgs_lost")})
+        board.write(out / "tasks.jsonl", task_snaps)
     (out / "metrics.json").write_text(json.dumps(metrics, indent=1), encoding="utf-8")
     (out / "trajectory.svg").write_text(paths_svg(out / "agents.jsonl", arena), encoding="utf-8")
     (out / "metrics.svg").write_text(series_svg(series, a.dt), encoding="utf-8")
@@ -973,6 +1010,12 @@ def main(argv: list[str] | None = None) -> int:
         default=0.0,
         help="ticks per second to emit (0 = as fast as possible); >0 paces a run for a live viewer",
     )
+    ap.add_argument("--alloc", choices=ALLOC_POLICIES, default="greedy", help="task allocation policy for --mission tasks")
+    ap.add_argument("--task-count", dest="task_count", type=int, default=6, help="tasks present at the start")
+    ap.add_argument("--task-rate", dest="task_rate", type=float, default=0.0, help="new tasks per 100 ticks (Poisson); 0 = none")
+    ap.add_argument("--task-size", dest="task_size", type=float, default=2.0, help="seconds an agent must stay at a task to serve it")
+    ap.add_argument("--deadline", type=float, default=0.0, help="seconds after arrival before a task is missed; 0 = no deadline")
+    ap.add_argument("--task-radius", dest="task_radius", type=float, default=1.0, help="metres within which an agent is at a task")
     ap.add_argument("--seed", type=int, default=7)
     for hook in EXTRA_ARGUMENTS:
         hook(ap)

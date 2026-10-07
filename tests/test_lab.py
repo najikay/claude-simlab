@@ -10,7 +10,7 @@ WORLDS = Path(__file__).resolve().parent / "worlds"  # tiny worlds the tests run
 
 def test_shipped_experiments_and_catalogue_agree(lab):
     names = [e["name"] for e in lab.experiments()]
-    assert names == ["swarm-coverage", "swarm-formation", "swarm-localisation", "synthetic-vo"]
+    assert names == ["swarm-coverage", "swarm-formation", "swarm-localisation", "swarm-tasks", "synthetic-vo"]
     cat = lab.catalogue()
     listed = {e for w in cat["worlds"] for e in w["experiments"]}
     assert listed == set(names)

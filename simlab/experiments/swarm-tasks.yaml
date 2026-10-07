@@ -1,0 +1,45 @@
+name: swarm-tasks
+description: "Swarm lab — distributed task allocation: tasks appear in the arena with a deadline, agents learn of them by sensing and from neighbours over lossy links, and each must decide which task to go for; compare greedy, a distributed auction, the central oracle (upper bound) and random on served, missed, conflicts and messages per task."
+tags: [swarm, multi-agent, allocation, decision, comms]
+command: "{python} simlab/worlds/swarm/sim.py --plans-dir {plans_dir} --out {run_dir} --agents {agents} --ticks {ticks} --mission tasks --alloc {alloc} --arena {arena} --decision-every {decision_every} --comm-range {comm_range} --comms {comms} --layout {layout} --sense-range {sense_range} --msg-loss {msg_loss} --msg-latency {msg_latency} --obs-noise {obs_noise} --task-count {task_count} --task-rate {task_rate} --task-size {task_size} --deadline {deadline} --task-radius {task_radius} --medium {medium} --vehicle {vehicle} --rate {rate} --seed {seed}"
+cwd: "{repo}"
+timeout_s: 600
+params:
+  agents: 6
+  ticks: 400
+  arena: 40.0
+  alloc: greedy          # greedy | auction | oracle | random
+  decision_every: 5
+  comms: range
+  layout: none
+  sense_range: 6.0       # metres within which an agent notices a task
+  comm_range: 12.0
+  msg_loss: 0.0
+  msg_latency: 0
+  obs_noise: 0.3
+  task_count: 8          # tasks present at the start
+  task_rate: 2.0         # new tasks per 100 ticks (Poisson); 0 = none
+  task_size: 2.0         # seconds an agent must stay at a task
+  deadline: 25.0         # seconds after arrival before a task is missed; 0 = no deadline
+  task_radius: 1.0
+  medium: air
+  vehicle: point
+  rate: 0
+  seed: 7
+outputs: {}
+metrics: [tasks_served, tasks_missed, served_pct, service_time_mean_s, service_time_p90_s, makespan_s, conflicts, msgs_per_served_task, distance_per_agent_m, msg_loss_pct, connected_pct]
+variants:
+  greedy:         { alloc: greedy }
+  auction:        { alloc: auction }
+  oracle:         { alloc: oracle }
+  random-control: { alloc: random }
+  ideal:          { msg_loss: 0.0, msg_latency: 0 }
+  lossy-comms:    { msg_loss: 0.5 }
+  delayed-comms:  { msg_latency: 10 }
+  short-range:    { comm_range: 6.0 }
+  office:         { layout: "plan:office", comms: los }
+  no-deadline:    { deadline: 0 }
+  busy:           { task_rate: 6.0 }
+  auction-ideal:  { alloc: auction, msg_loss: 0.0 }
+  auction-lossy:  { alloc: auction, msg_loss: 0.5 }
+  greedy-lossy:   { alloc: greedy, msg_loss: 0.5 }

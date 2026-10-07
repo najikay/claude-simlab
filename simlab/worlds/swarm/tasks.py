@@ -1,0 +1,328 @@
+"""Distributed task allocation for the swarm world (mission ``tasks``).
+
+Tasks appear in the arena (a position, a service time, a deadline). An agent learns of a task only by
+sensing it within ``sense_range`` or by hearing about it from a neighbour; task news and claims travel
+over the same links as everything else, with the same loss and latency. Every ``decision_every`` ticks
+each agent picks a task by the allocation policy:
+
+``greedy``   the nearest task it knows is open (it may collide with a neighbour's choice)
+``auction``  bid = distance; a claim is broadcast; an agent that hears a lower bid on its task drops it
+             and picks again (lowest bid wins, ties by id: a one-round distributed auction)
+``oracle``   a central Hungarian assignment over the true state every decision tick (sees everything,
+             sends nothing): the upper bound
+``random``   a random known open task: the control
+
+A task is served when an agent stays within ``task_radius`` of it for ``task_size`` seconds; a task whose
+deadline passes unserved is missed. Two agents committed to one task at the same tick is a conflict.
+"""
+
+from __future__ import annotations
+
+import json
+import random
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+
+POLICIES = ["greedy", "auction", "oracle", "random"]
+
+
+def hungarian(cost: np.ndarray) -> list[tuple[int, int]]:
+    """Minimum-cost assignment of rows to columns (Kuhn-Munkres with potentials, O(n^2 m)).
+
+    Rectangular matrices are fine: every row of the smaller side is matched. Pure numpy, so the
+    plugin needs no scipy. Returns (row, col) pairs.
+    """
+    a = np.asarray(cost, dtype=float)
+    transposed = a.shape[0] > a.shape[1]
+    if transposed:
+        a = a.T
+    n, m = a.shape
+    inf = float("inf")
+    u = [0.0] * (n + 1)
+    v = [0.0] * (m + 1)
+    p = [0] * (m + 1)  # column -> row (1-based), 0 = free
+    way = [0] * (m + 1)
+    for i in range(1, n + 1):
+        p[0] = i
+        j0 = 0
+        minv = [inf] * (m + 1)
+        used = [False] * (m + 1)
+        while True:
+            used[j0] = True
+            i0 = p[j0]
+            delta, j1 = inf, 0
+            for j in range(1, m + 1):
+                if not used[j]:
+                    cur = a[i0 - 1, j - 1] - u[i0] - v[j]
+                    if cur < minv[j]:
+                        minv[j], way[j] = cur, j0
+                    if minv[j] < delta:
+                        delta, j1 = minv[j], j
+            for j in range(m + 1):
+                if used[j]:
+                    u[p[j]] += delta
+                    v[j] -= delta
+                else:
+                    minv[j] -= delta
+            j0 = j1
+            if p[j0] == 0:
+                break
+        while True:
+            j1 = way[j0]
+            p[j0] = p[j1]
+            j0 = j1
+            if j0 == 0:
+                break
+    pairs = [(p[j] - 1, j - 1) for j in range(1, m + 1) if p[j]]
+    return [(c, r) for r, c in pairs] if transposed else pairs
+
+
+@dataclass
+class Task:
+    id: int
+    pos: np.ndarray
+    size_ticks: int
+    arrival: int
+    deadline: int | None  # tick, or None for no deadline
+    served_at: int | None = None
+    missed_at: int | None = None
+    served_by: int | None = None
+    progress: dict[int, int] = field(default_factory=dict)  # agent -> service ticks accumulated
+
+    @property
+    def open(self) -> bool:
+        return self.served_at is None and self.missed_at is None
+
+
+@dataclass
+class Claim:
+    task: int
+    bid: float
+    since: int
+
+
+class TaskBoard:  # noqa: PLR0902 - the state of one mission
+    """Tasks, what each agent knows, claims, and the counts."""
+
+    def __init__(  # noqa: PLR0913, PLR0917
+        self,
+        n: int,
+        arena: float,
+        rng: np.random.Generator,
+        rnd: random.Random,
+        *,
+        task_count: int,
+        task_rate: float,
+        task_size_ticks: int,
+        deadline_ticks: int | None,
+        task_radius: float,
+        sense_range: float,
+        msg_loss: float,
+        msg_latency: int,
+        policy: str,
+        ticks: int,
+    ) -> None:
+        if policy not in POLICIES:
+            raise ValueError(f"alloc must be one of {POLICIES}")
+        self.n, self.arena, self.rng, self.rnd = n, arena, rng, rnd
+        self.rate, self.size, self.deadline = task_rate, max(1, task_size_ticks), deadline_ticks
+        self.radius, self.sense_range, self.loss, self.latency = task_radius, sense_range, msg_loss, msg_latency
+        self.policy, self.ticks = policy, ticks
+        self.tasks: list[Task] = []
+        self.known: list[dict[int, int]] = [{} for _ in range(n)]  # agent -> {task id: tick heard}
+        self.heard_served: list[set[int]] = [set() for _ in range(n)]
+        self.heard_bids: list[dict[int, tuple[float, int]]] = [{} for _ in range(n)]  # task -> (bid, agent)
+        self.claims: list[Claim | None] = [None] * n
+        self.queue: list[tuple[int, int, dict]] = []  # (deliver_at, dst, news)
+        self.msgs_sent = 0
+        self.msgs_lost = 0
+        self.conflict_ticks = 0
+        self.conflicts = 0
+        self.distance = np.zeros(n)
+        self._next_id = 0
+        for _ in range(task_count):
+            self._spawn(0)
+
+    # -- the world --------------------------------------------------------------------------
+    def _spawn(self, tick: int) -> Task:
+        t = Task(
+            id=self._next_id,
+            pos=self.rng.uniform(0.1 * self.arena, 0.9 * self.arena, size=2),
+            size_ticks=self.size,
+            arrival=tick,
+            deadline=None if self.deadline is None else tick + self.deadline,
+        )
+        self._next_id += 1
+        self.tasks.append(t)
+        return t
+
+    def arrive(self, tick: int) -> None:
+        """Poisson arrivals: ``task_rate`` tasks per 100 ticks on average."""
+        if self.rate > 0 and tick > 0:
+            for _ in range(int(self.rng.poisson(self.rate / 100.0))):
+                self._spawn(tick)
+
+    def sense(self, tick: int, pos: np.ndarray) -> None:
+        """An agent learns of every open task within its sensing range (and sees a served one as served)."""
+        for t in self.tasks:
+            d = np.linalg.norm(pos - t.pos, axis=1)
+            for i in np.nonzero(d <= self.sense_range)[0]:
+                if t.open:
+                    self.known[i].setdefault(t.id, tick)
+                else:
+                    self.heard_served[i].add(t.id)
+
+    # -- the links ---------------------------------------------------------------------------
+    def exchange(self, tick: int, edges: list[tuple[int, int]]) -> None:
+        """Task news (ids I know, ids I know are done, my claim) along every link, lossy and late."""
+        if self.policy == "oracle":
+            return  # the oracle assigns from the true state and reads no message
+        for i, j in edges:
+            for src, dst in ((i, j), (j, i)):
+                news = {
+                    "known": list(self.known[src].keys()),
+                    "done": list(self.heard_served[src]),
+                    "claim": (self.claims[src].task, self.claims[src].bid, src) if self.claims[src] else None,
+                }
+                self.msgs_sent += 1
+                if self.rnd.random() < self.loss:
+                    self.msgs_lost += 1
+                    continue
+                self.queue.append((tick + self.latency, dst, news))
+        due = [m for m in self.queue if m[0] <= tick]
+        self.queue = [m for m in self.queue if m[0] > tick]
+        for _, dst, news in due:
+            for tid in news["known"]:
+                self.known[dst].setdefault(tid, tick)
+            self.heard_served[dst].update(news["done"])
+            if news["claim"] is not None:
+                tid, bid, who = news["claim"]
+                best = self.heard_bids[dst].get(tid)
+                if best is None or (bid, who) < best:
+                    self.heard_bids[dst][tid] = (bid, who)
+
+    # -- the decision ------------------------------------------------------------------------
+    def _open_known(self, i: int) -> list[Task]:
+        by_id = {t.id: t for t in self.tasks}
+        return [by_id[tid] for tid in self.known[i] if tid in by_id and by_id[tid].open and tid not in self.heard_served[i]]
+
+    def decide(self, tick: int, pos: np.ndarray) -> None:  # noqa: C901
+        """Every agent (re)chooses a task by the policy; the oracle assigns everyone at once."""
+        if self.policy == "oracle":
+            open_tasks = [t for t in self.tasks if t.open]
+            self.claims = [None] * self.n
+            if open_tasks:
+                cost = np.array([[np.linalg.norm(pos[i] - t.pos) for t in open_tasks] for i in range(self.n)])
+                for r, c in hungarian(cost):
+                    self.claims[r] = Claim(open_tasks[c].id, float(cost[r, c]), tick)
+            return
+        for i in range(self.n):
+            cur = self.claims[i]
+            if cur is not None:
+                t = next((x for x in self.tasks if x.id == cur.task), None)
+                if t is None or not t.open or cur.task in self.heard_served[i]:
+                    cur = None
+                elif self.policy == "auction":
+                    best = self.heard_bids[i].get(cur.task)
+                    if best is not None and (best[0], best[1]) < (cur.bid, i):
+                        cur = None  # someone nearer claimed it: give way
+            if cur is not None and self.policy != "random":
+                self.claims[i] = cur
+                continue
+            cands = self._open_known(i)
+            if self.policy == "auction":
+                cands = [
+                    t
+                    for t in cands
+                    if (b := self.heard_bids[i].get(t.id)) is None or (float(np.linalg.norm(pos[i] - t.pos)), i) < b
+                ]
+            if not cands:
+                self.claims[i] = None
+                continue
+            if self.policy == "random":
+                t = cands[self.rnd.randrange(len(cands))]
+            else:
+                t = min(cands, key=lambda x: float(np.linalg.norm(pos[i] - x.pos)))
+            self.claims[i] = Claim(t.id, float(np.linalg.norm(pos[i] - t.pos)), tick)
+
+    def target(self, i: int) -> np.ndarray | None:
+        c = self.claims[i]
+        if c is None:
+            return None
+        t = next((x for x in self.tasks if x.id == c.task), None)
+        return None if t is None or not t.open else t.pos
+
+    # -- the service -------------------------------------------------------------------------
+    def serve(self, tick: int, pos: np.ndarray, vel: np.ndarray, dt: float) -> None:
+        """Progress on claimed tasks, misses, conflicts, distance."""
+        self.distance += np.linalg.norm(vel, axis=1) * dt
+        committed: dict[int, list[int]] = {}
+        for i, c in enumerate(self.claims):
+            if c is not None:
+                committed.setdefault(c.task, []).append(i)
+        clash = sum(len(v) - 1 for v in committed.values() if len(v) > 1)
+        if clash:
+            self.conflict_ticks += 1
+            self.conflicts += clash
+        by_id = {t.id: t for t in self.tasks}
+        for tid, agents in committed.items():
+            t = by_id.get(tid)
+            if t is None or not t.open:
+                continue
+            for i in agents:
+                if np.linalg.norm(pos[i] - t.pos) <= self.radius:
+                    t.progress[i] = t.progress.get(i, 0) + 1
+                    if t.progress[i] >= t.size_ticks:
+                        t.served_at, t.served_by = tick, i
+                        for k in range(self.n):
+                            if k == i or np.linalg.norm(pos[k] - t.pos) <= self.sense_range:
+                                self.heard_served[k].add(tid)
+                        break
+        for t in self.tasks:
+            if t.open and t.deadline is not None and tick >= t.deadline:
+                t.missed_at = tick
+
+    # -- the numbers -------------------------------------------------------------------------
+    def snapshot(self, tick: int) -> dict:
+        return {
+            "t": tick,
+            "tasks": [
+                {
+                    "id": t.id,
+                    "x": round(float(t.pos[0]), 3),
+                    "y": round(float(t.pos[1]), 3),
+                    "state": "served" if t.served_at is not None else "missed" if t.missed_at is not None else "claimed" if any(c and c.task == t.id for c in self.claims) else "open",
+                }
+                for t in self.tasks
+                if t.arrival <= tick
+            ],
+            "claims": [c.task if c else None for c in self.claims],
+        }
+
+    def metrics(self, dt: float) -> dict:
+        served = [t for t in self.tasks if t.served_at is not None]
+        missed = [t for t in self.tasks if t.missed_at is not None]
+        times = sorted((t.served_at - t.arrival) * dt for t in served)
+        p90 = times[min(len(times) - 1, int(0.9 * len(times)))] if times else None
+        return {
+            "tasks_total": len(self.tasks),
+            "tasks_served": len(served),
+            "tasks_missed": len(missed),
+            "served_pct": round(100 * len(served) / max(1, len(self.tasks)), 1),
+            "service_time_mean_s": round(float(np.mean(times)), 2) if times else None,
+            "service_time_p90_s": round(float(p90), 2) if p90 is not None else None,
+            "makespan_s": round(max(t.served_at for t in served) * dt, 2) if served else None,
+            "conflicts": self.conflicts,
+            "conflict_ticks": self.conflict_ticks,
+            "task_msgs": self.msgs_sent,
+            "task_msgs_lost": self.msgs_lost,
+            "msgs_per_served_task": round(self.msgs_sent / max(1, len(served)), 1),
+            "distance_per_agent_m": round(float(self.distance.mean()), 1),
+        }
+
+    def write(self, path: Path, snapshots: list[dict]) -> None:
+        with path.open("w", encoding="utf-8") as f:
+            for s in snapshots:
+                f.write(json.dumps(s) + "\n")
