@@ -38,6 +38,7 @@ def test_server_surface_and_a_full_session(tmp_path, monkeypatch):
         "get_experiment",
         "run_experiment",
         "run_campaign",
+        "repeat",
         "tune",
         "list_runs",
         "get_run",

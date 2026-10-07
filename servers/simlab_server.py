@@ -105,6 +105,22 @@ TOOLS = [
                 "description": "variant names; default: all of them",
             },
             "params": PARAMS,
+            "seeds": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "description": "each variant over every seed; the result then carries mean ± std per metric per variant",
+            },
+        },
+        ["name"],
+    ),
+    _tool(
+        "repeat",
+        "Run one configuration over several seeds (default 1..5) and return mean, std, min and max per headline metric: the number to report instead of a single run. Blocks until the runs end.",
+        {
+            "name": {"type": "string"},
+            "variant": {"type": "string"},
+            "params": PARAMS,
+            "seeds": {"type": "array", "items": {"type": "integer"}},
         },
         ["name"],
     ),
@@ -257,8 +273,18 @@ def call(name: str, args: dict) -> str:
             isinstance(variants, list) and all(isinstance(v, str) for v in variants)
         ):
             raise ValueError("variants must be a list of names")
-        c = lab().campaign(str(args["name"]), variants or None, args.get("params") or {})
+        seeds = args.get("seeds")
+        if seeds is not None and not (isinstance(seeds, list) and all(isinstance(x, int) for x in seeds)):
+            raise ValueError("seeds must be a list of integers")
+        c = lab().campaign(str(args["name"]), variants or None, args.get("params") or {}, seeds=seeds or None)
         return json.dumps(c, ensure_ascii=False, indent=1)
+    if name == "repeat":
+        _need(args, "name")
+        seeds = args.get("seeds")
+        if seeds is not None and not (isinstance(seeds, list) and all(isinstance(x, int) for x in seeds)):
+            raise ValueError("seeds must be a list of integers")
+        r = lab().repeat(str(args["name"]), args.get("params") or {}, variant=args.get("variant") or None, seeds=seeds or None)
+        return json.dumps(r, ensure_ascii=False, indent=1)
     if name == "tune":
         _need(args, "name", "objective", "space")
         if not isinstance(args["space"], dict):

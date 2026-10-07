@@ -61,6 +61,24 @@ def default_home() -> Path:
     return Path.home() / ".simlab"
 
 
+
+def summarise(rows: list[dict]) -> dict:
+    """Mean, population std, min, max and n per metric over the rows that have it."""
+    keys: list[str] = []
+    for r in rows:
+        for k in r:
+            if k not in keys and k not in BOOKKEEPING:
+                keys.append(k)
+    out: dict[str, dict] = {}
+    for k in keys:
+        xs = [r[k] for r in rows if k in r]
+        if not xs:
+            continue
+        mean = sum(xs) / len(xs)
+        std = (sum((x - mean) ** 2 for x in xs) / len(xs)) ** 0.5
+        out[k] = {"mean": round(mean, 4), "std": round(std, 4), "min": min(xs), "max": max(xs), "n": len(xs)}
+    return out
+
 class Lab:
     """Experiments, runs, campaigns, tuning, comparison, the catalogue and floor plans."""
 
@@ -455,8 +473,11 @@ class Lab:
         return out
 
     # -- campaigns, compare, tune ----------------------------------------------------------------
-    def campaign(self, name: str, variants: list[str] | None = None, params: dict | None = None) -> dict:
-        """Run several variants one after another under one campaign id."""
+    def campaign(
+        self, name: str, variants: list[str] | None = None, params: dict | None = None, seeds: list[int] | None = None
+    ) -> dict:
+        """Run several variants one after another under one campaign id; with ``seeds``, each variant over
+        every seed, and ``summary`` holds mean, std, min, max and n per metric per variant."""
         exp = self.experiment(name)
         known = exp.get("variants") or {}
         chosen = list(variants or sorted(known))
@@ -465,15 +486,46 @@ class Lab:
         unknown = [v for v in chosen if v not in known]
         if unknown:
             raise ValueError(f"unknown variant(s) {unknown}; one of {sorted(known)}")
+        seeds = [int(x) for x in seeds] if seeds else []
+        if len(seeds) > 50:
+            raise ValueError("at most 50 seeds")
         cid = f"c-{uuid.uuid4().hex[:6]}"
-        runs = [self.run(name, params, variant=v, campaign=cid) for v in chosen]
-        return {
+        runs: list[dict] = []
+        per_variant: dict[str, list[dict]] = {v: [] for v in chosen}
+        for v in chosen:
+            for sd in seeds or [None]:
+                pv = {**(params or {}), **({"seed": sd} if sd is not None else {})}
+                r = self.run(name, pv, variant=v, campaign=cid)
+                runs.append(r)
+                h = (self.get(r["run_id"])["manifest"].get("headline") or {}) if seeds else {}
+                per_variant[v].append({k: float(x) for k, x in h.items() if isinstance(x, (int, float)) and not isinstance(x, bool)})
+        out = {
             "id": cid,
             "experiment": name,
             "variants": chosen,
+            "seeds": seeds,
             "runs": [r["run_id"] for r in runs],
             "compare": self.compare([r["run_id"] for r in runs]),
         }
+        if seeds:
+            out["summary"] = {v: summarise(rows) for v, rows in per_variant.items() if rows}
+        return out
+
+    def repeat(self, name: str, params: dict | None = None, variant: str | None = None, seeds: list[int] | None = None) -> dict:
+        """One configuration over N seeds: the runs and mean, std, min, max and n per headline metric."""
+        self.experiment(name)
+        seeds = [int(x) for x in (seeds if seeds else [1, 2, 3, 4, 5])]
+        if len(seeds) > 50:
+            raise ValueError("at most 50 seeds")
+        rid = f"r-{uuid.uuid4().hex[:6]}"
+        rows: list[dict] = []
+        runs: list[str] = []
+        for sd in seeds:
+            r = self.run(name, {**(params or {}), "seed": sd}, variant=variant, campaign=rid)
+            runs.append(r["run_id"])
+            h = self.get(r["run_id"])["manifest"].get("headline") or {}
+            rows.append({k: float(x) for k, x in h.items() if isinstance(x, (int, float)) and not isinstance(x, bool)})
+        return {"id": rid, "experiment": name, "variant": variant, "seeds": seeds, "runs": runs, "summary": summarise(rows)}
 
     def metrics_of(self, experiment: str) -> set[str]:
         """Headline metric names an experiment can produce: its YAML list plus its world's catalogue metrics."""

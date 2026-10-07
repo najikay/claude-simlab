@@ -177,3 +177,13 @@ def test_world_processes_get_only_the_allow_listed_variables(lab, monkeypatch):
     m = lab.run("env")
     assert m["status"] == "done", m["error"]
     assert m["headline"] == {"leaked": 0, "has_path": 1}
+
+
+def test_repeat_and_seeded_campaign_summarise(lab):
+    r = lab.repeat("synthetic-vo", {"steps": 30, "rate": 0}, seeds=[1, 2])
+    assert len(r["runs"]) == 2 and r["summary"]["ate_rmse_m"]["n"] == 2 and r["summary"]["ate_rmse_m"]["std"] >= 0
+    assert all(lab.get(rid)["manifest"]["campaign"] == r["id"] for rid in r["runs"])
+    c = lab.campaign("synthetic-vo", ["clean", "mixed"], {"steps": 30, "rate": 0}, seeds=[1, 2])
+    assert len(c["runs"]) == 4 and set(c["summary"]) == {"clean", "mixed"} and c["summary"]["clean"]["ate_rmse_m"]["n"] == 2
+    plain = lab.campaign("synthetic-vo", ["clean"], {"steps": 30, "rate": 0})
+    assert "summary" not in plain and plain["seeds"] == []
