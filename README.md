@@ -96,7 +96,7 @@ The numbers above are from real runs on this machine. Ask for "a findings note" 
 | `swarm-formation` | Does the ring close under loss, latency, noise, walls, water, fog, a vehicle model? | `formation_error_m` ↓ |
 | `swarm-coverage` | How much of the arena (or the office) gets visited, and at what collision cost? | `coverage_pct` ↑ |
 | `swarm-localisation` | Odometry alone vs naive EKF fusion vs covariance intersection, with and without anchors. | `belief_error_m` ↓ |
-| `swarm-tasks` | Who should take which task when agents only know what their neighbours told them: greedy, a distributed auction, the central oracle, random. | `served_pct` ↑, `conflicts` ↓ |
+| `swarm-tasks` | Who should take which task when agents only know what they sense or hear: greedy (and greedy that re-evaluates), a give-way rule on neighbours' positions (`yield`), a one-hop auction, CBAA (Choi, Brunet and How 2009), a central oracle, random; radio on or off. | `early_served_pct` ↑, `conflicts` ↓, `blind_pct` ↓ |
 | `synthetic-vo` | How ATE and RPE grow with each noise model, dropout and latency. | `ate_rmse_m` ↓ |
 
 Each has 8 to 22 named variants (`lossy-comms`, `office-los`, `water`, `fixed-wing`, `anchors2-ci`, `drift`, `auction`, `budget-1`, `connected-0.3`, …). `docs/WORLDS.md` explains the models; the catalogue is the authoritative list of knobs.
