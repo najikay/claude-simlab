@@ -269,6 +269,20 @@ def graph_connectivity(n: int, edges: list[tuple[int, int]]) -> tuple[int, float
     return components, (0.0 if components > 1 else float(max(0.0, ev[1])))
 
 
+def local_lambda2(me: np.ndarray, others: list[np.ndarray], comm_range: float) -> float:
+    """λ2 of the graph an agent can see: itself and the neighbours it holds beliefs about, linked by range.
+
+    This is the agent's own estimate (what it knows, one tick old), not the swarm's true λ2: the
+    connectivity-aware behaviour plans on it, and the metrics report the true one.
+    """
+    pts = [me, *others]
+    n = len(pts)
+    if n <= 1:
+        return 0.0
+    edges = [(i, j) for i in range(n) for j in range(i + 1, n) if np.linalg.norm(pts[i] - pts[j]) <= comm_range]
+    return graph_connectivity(n, edges)[1]
+
+
 class Comms:
     """Range graph with loss and latency; delivers neighbour beliefs a few ticks late."""
 
@@ -280,8 +294,10 @@ class Comms:
         msg_latency: int,
         rnd: random.Random,
         los: Obstacles | None = None,
+        budget: int = 0,
     ) -> None:
         self.n, self.range, self.loss, self.latency, self.rnd = n, comm_range, msg_loss, msg_latency, rnd
+        self.budget = budget  # messages an agent may send per tick; 0 = one to every neighbour
         self.los = los  # when set, a link also needs line of sight past these obstacles
         self.blocked = 0  # pairs in range but without line of sight, this tick
         self.queue: list[tuple[int, int, int, np.ndarray]] = []  # (deliver_at, src, dst, belief)
@@ -291,6 +307,7 @@ class Comms:
         self.sent = 0
         self.lost = 0
         self.edges: list[tuple[int, int]] = []
+        self.links_used: list[tuple[int, int]] = []
 
     def step(self, tick: int, pos: np.ndarray, beliefs: np.ndarray) -> None:
         """Rebuild the graph from true positions, send beliefs along edges, deliver what is due."""
@@ -302,17 +319,31 @@ class Comms:
             self.blocked = len(pairs) - len(self.edges)
         else:
             self.edges, self.blocked = pairs, 0
-        for i, j in self.edges:
-            for src, dst in ((i, j), (j, i)):
-                self.sent += 1
-                if self.rnd.random() < self.loss:
-                    self.lost += 1
-                    continue
-                self.queue.append((tick + self.latency, src, dst, beliefs[src].copy()))
+        self.links_used = self.pick_links(self.edges)
+        for src, dst in self.links_used:
+            self.sent += 1
+            if self.rnd.random() < self.loss:
+                self.lost += 1
+                continue
+            self.queue.append((tick + self.latency, src, dst, beliefs[src].copy()))
         due = [m for m in self.queue if m[0] <= tick]
         self.queue = [m for m in self.queue if m[0] > tick]
         for _, src, dst, belief in due:
             self.known[dst][src] = (tick, belief)
+
+    def pick_links(self, edges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        """The directed sends of this tick: every link both ways, or at most ``budget`` per agent, chosen at random."""
+        if self.budget <= 0:
+            return [(s, d) for i, j in edges for s, d in ((i, j), (j, i))]
+        out_of: dict[int, list[int]] = {}
+        for i, j in edges:
+            out_of.setdefault(i, []).append(j)
+            out_of.setdefault(j, []).append(i)
+        sends: list[tuple[int, int]] = []
+        for src, dsts in out_of.items():
+            chosen = dsts if len(dsts) <= self.budget else self.rnd.sample(dsts, self.budget)
+            sends.extend((src, d) for d in chosen)
+        return sends
 
     def neighbours(self, i: int, tick: int, max_age: int) -> dict[int, np.ndarray]:
         """Beliefs an agent holds about others, dropping stale ones."""
@@ -545,8 +576,10 @@ def run(a: argparse.Namespace) -> dict:
         a.msg_latency + medium.latency_add,
         rnd,
         los=obstacles if getattr(a, "comms", "range") == "los" else None,
+        budget=int(getattr(a, "msg_budget", 0) or 0),
     )
     hits_total = 0
+    holds = np.zeros(n, dtype=int)  # ticks on which the connectivity floor overrode the mission, per agent
     board = (
         TaskBoard(
             n, arena, rng, rnd,
@@ -660,7 +693,7 @@ def run(a: argparse.Namespace) -> dict:
         belief_err.append(float(np.mean(np.linalg.norm(belief - pos, axis=1))))
         comms.step(tick, pos, belief)
         if board is not None:
-            board.exchange(tick, comms.edges)
+            board.exchange(tick, comms.links_used)
         d = np.linalg.norm(pos[:, None, :] - pos[None, :, :], axis=2) + np.eye(n) * 1e9
         min_d = d.min(axis=1)
         collisions = int((d < a.collision_r).sum() // 2)
@@ -729,6 +762,17 @@ def run(a: argparse.Namespace) -> dict:
             v = behaviour_velocity(
                 behaviour[i], i, belief[i], vel[i], nb, offsets, grid, assigned[i], arena, a.max_speed
             )
+            if a.lambda2_floor > 0 and nb:
+                # planning under a constraint: if the move would drop the connectivity I can see under the
+                # floor, hold the mission and move toward my neighbours instead (the swarm's true λ2 is measured)
+                others = list(nb.values())
+                ahead = belief[i] + v * a.dt * a.lookahead
+                if local_lambda2(ahead, others, comms.range) < a.lambda2_floor:
+                    centre = np.mean(others, axis=0)
+                    pull = centre - belief[i]
+                    sp = np.linalg.norm(pull)
+                    v = pull / sp * a.max_speed if sp > 1e-6 else -vel[i]
+                    holds[i] += 1
             if (
                 obstacles
             ):  # sensed obstacles push back (on the true position: a proximity sensor, not the belief)
@@ -830,6 +874,7 @@ def run(a: argparse.Namespace) -> dict:
                 1,
             ),
             "obstacle_hits": hits_total,
+            "connectivity_holds_pct": round(100 * float(holds.sum()) / max(1, n * a.ticks), 1),
         },
         "series": series,
         "tasks": board.metrics(a.dt) if board is not None else None,
@@ -881,6 +926,9 @@ def main(argv: list[str] | None = None) -> int:
         "--decision-every", dest="decision_every", type=int, default=10, help="ticks between decisions"
     )
     ap.add_argument("--comm-range", dest="comm_range", type=float, default=10.0)
+    ap.add_argument("--msg-budget", dest="msg_budget", type=int, default=0, help="messages an agent may send per tick; 0 = one to every neighbour")
+    ap.add_argument("--lambda2-floor", dest="lambda2_floor", type=float, default=0.0, help="hold the mission when the agent's own estimate of connectivity would drop under this; 0 = off")
+    ap.add_argument("--lookahead", type=float, default=5.0, help="ticks ahead the connectivity check looks")
     ap.add_argument(
         "--comms",
         choices=["range", "los"],

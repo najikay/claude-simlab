@@ -175,22 +175,22 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
                     self.heard_served[i].add(t.id)
 
     # -- the links ---------------------------------------------------------------------------
-    def exchange(self, tick: int, edges: list[tuple[int, int]]) -> None:
-        """Task news (ids I know, ids I know are done, my claim) along every link, lossy and late."""
+    def exchange(self, tick: int, sends: list[tuple[int, int]]) -> None:
+        """Task news (ids I know, ids I know are done, my claim) on every directed send of the tick
+        (the same links, budget, loss and latency as the position beliefs)."""
         if self.policy == "oracle":
             return  # the oracle assigns from the true state and reads no message
-        for i, j in edges:
-            for src, dst in ((i, j), (j, i)):
-                news = {
-                    "known": list(self.known[src].keys()),
-                    "done": list(self.heard_served[src]),
-                    "claim": (self.claims[src].task, self.claims[src].bid, src) if self.claims[src] else None,
-                }
-                self.msgs_sent += 1
-                if self.rnd.random() < self.loss:
-                    self.msgs_lost += 1
-                    continue
-                self.queue.append((tick + self.latency, dst, news))
+        for src, dst in sends:
+            news = {
+                "known": list(self.known[src].keys()),
+                "done": list(self.heard_served[src]),
+                "claim": (self.claims[src].task, self.claims[src].bid, src) if self.claims[src] else None,
+            }
+            self.msgs_sent += 1
+            if self.rnd.random() < self.loss:
+                self.msgs_lost += 1
+                continue
+            self.queue.append((tick + self.latency, dst, news))
         due = [m for m in self.queue if m[0] <= tick]
         self.queue = [m for m in self.queue if m[0] > tick]
         for _, dst, news in due:
