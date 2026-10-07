@@ -135,3 +135,35 @@ def test_the_lambda2_floor_trades_coverage_for_connectivity(tmp_path):
         got[name] = json.loads((out / "metrics.json").read_text(encoding="utf-8"))["headline"]
     assert got["off"]["connectivity_holds_pct"] == 0 and got["on"]["connectivity_holds_pct"] > 0
     assert got["on"]["mean_lambda2"] > got["off"]["mean_lambda2"]
+
+
+def test_an_embedding_project_can_register_an_allocation_policy():
+    pos = np.array([[10.0, 10.0], [30.0, 30.0]])
+    calls = []
+
+    def farthest(views, args):
+        calls.append(len(views))
+        return [max(v["known"], key=lambda k: k["distance_m"])["task"] if v["known"] else None for v in views]
+
+    def broken(views, args):
+        raise RuntimeError("down")
+
+    tasks.EXTRA_ALLOC["far"] = farthest
+    tasks.EXTRA_ALLOC["broken"] = broken
+    try:
+        b = board("far")
+        b.tasks.append(tasks.Task(id=0, pos=np.array([11.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
+        b.tasks.append(tasks.Task(id=1, pos=np.array([20.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
+        b.sense(0, pos)
+        b.decide(0, pos)
+        assert calls == [2] and b.claims[0].task == 1  # the far one, as the policy says
+        v = b.views(0, pos)[0]
+        assert {k["task"] for k in v["known"]} == {0, 1} and v["known"][0]["deadline_s"] is None
+        bb = board("broken")
+        bb.tasks.append(tasks.Task(id=0, pos=np.array([11.0, 10.0]), size_ticks=3, arrival=0, deadline=None))
+        bb.sense(0, pos)
+        bb.decide(0, pos)
+        assert bb.policy == "broken" and bb.claims[0].task == 0  # fell back to greedy for the tick, policy kept
+    finally:
+        tasks.EXTRA_ALLOC.pop("far", None)
+        tasks.EXTRA_ALLOC.pop("broken", None)

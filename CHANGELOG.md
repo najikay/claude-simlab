@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 (2026-10-07)
+
+- `EXTRA_ALLOC`: an embedding project can add a task-allocation policy without forking (a callable over each agent's view: its known open tasks with distance, seconds to the deadline and the best bid heard); on an error the board falls back to greedy for that decision and says so. The workbench registers `laya` this way.
+- With the smooth estimate (0.2.1) the floor sweep on coverage gives a curve: coverage 89 → 79 → 65 → 51 % at floors 0 / 0.1 / 0.3 / 0.8 while the swarm is connected 3 → 54 → 84 → 91 % of ticks (8 agents, 3 seeds).
+
 ## 0.2.1 (2026-10-07)
 
 - The connectivity estimate behind `lambda2_floor` is the λ2 of a weighted graph (edge weight falling from 1 to 0 across `comm_range`, after Zavlanos and Pappas), so it changes smoothly as agents move; in 0.2.0 it stepped between 0 and 2 at low degree and the floor's value hardly mattered.

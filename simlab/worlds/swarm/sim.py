@@ -49,6 +49,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import world
+import tasks as task_alloc
 from tasks import POLICIES as ALLOC_POLICIES
 from tasks import TaskBoard
 from dynamics import (
@@ -598,7 +599,7 @@ def run(a: argparse.Namespace) -> dict:
             task_count=a.task_count, task_rate=a.task_rate, task_size_ticks=max(1, int(round(a.task_size / a.dt))),
             deadline_ticks=int(round(a.deadline / a.dt)) if a.deadline > 0 else None, task_radius=a.task_radius,
             sense_range=sense_range, msg_loss=min(1.0, a.msg_loss + medium.loss_add), msg_latency=a.msg_latency + medium.latency_add,
-            policy=a.alloc, ticks=a.ticks,
+            policy=a.alloc, ticks=a.ticks, dt=a.dt,
         )
         if a.mission == "tasks"
         else None
@@ -735,7 +736,7 @@ def run(a: argparse.Namespace) -> dict:
             )
         if board is not None:
             if tick % a.decision_every == 0:
-                board.decide(tick, pos)
+                board.decide(tick, pos, a)
                 for i in range(n):
                     decisions_by_source[f"alloc:{a.alloc}"] = decisions_by_source.get(f"alloc:{a.alloc}", 0) + 1
                     c = board.claims[i]
@@ -1070,7 +1071,7 @@ def main(argv: list[str] | None = None) -> int:
         default=0.0,
         help="ticks per second to emit (0 = as fast as possible); >0 paces a run for a live viewer",
     )
-    ap.add_argument("--alloc", choices=ALLOC_POLICIES, default="greedy", help="task allocation policy for --mission tasks")
+    ap.add_argument("--alloc", choices=[*ALLOC_POLICIES, *task_alloc.EXTRA_ALLOC], default="greedy", help="task allocation policy for --mission tasks")
     ap.add_argument("--task-count", dest="task_count", type=int, default=6, help="tasks present at the start")
     ap.add_argument("--task-rate", dest="task_rate", type=float, default=0.0, help="new tasks per 100 ticks (Poisson); 0 = none")
     ap.add_argument("--task-size", dest="task_size", type=float, default=2.0, help="seconds an agent must stay at a task to serve it")

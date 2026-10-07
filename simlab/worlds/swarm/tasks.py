@@ -26,6 +26,11 @@ from pathlib import Path
 import numpy as np
 
 POLICIES = ["greedy", "auction", "oracle", "random"]
+# an embedding project can add an allocation policy without forking (the workbench adds "laya"):
+# name -> callable(views, args) -> one chosen task id (or None) per view, in order. A view carries the
+# agent's id and position and the open tasks it knows (id, distance, seconds to the deadline, the best
+# bid it has heard). On any error the board falls back to greedy for that decision.
+EXTRA_ALLOC: dict = {}
 
 
 def hungarian(cost: np.ndarray) -> list[tuple[int, int]]:
@@ -123,9 +128,11 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         msg_latency: int,
         policy: str,
         ticks: int,
+        dt: float = 0.1,
     ) -> None:
-        if policy not in POLICIES:
-            raise ValueError(f"alloc must be one of {POLICIES}")
+        if policy not in POLICIES and policy not in EXTRA_ALLOC:
+            raise ValueError(f"alloc must be one of {POLICIES + list(EXTRA_ALLOC)}")
+        self.dt = dt
         self.n, self.arena, self.rng, self.rnd = n, arena, rng, rnd
         self.rate, self.size, self.deadline = task_rate, max(1, task_size_ticks), deadline_ticks
         self.radius, self.sense_range, self.loss, self.latency = task_radius, sense_range, msg_loss, msg_latency
@@ -208,8 +215,43 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         by_id = {t.id: t for t in self.tasks}
         return [by_id[tid] for tid in self.known[i] if tid in by_id and by_id[tid].open and tid not in self.heard_served[i]]
 
-    def decide(self, tick: int, pos: np.ndarray) -> None:  # noqa: C901
+    def views(self, tick: int, pos: np.ndarray) -> list[dict]:
+        """What each agent knows, for an external allocation policy."""
+        out = []
+        for i in range(self.n):
+            known = []
+            for t in self._open_known(i):
+                bid = self.heard_bids[i].get(t.id)
+                known.append({
+                    "task": t.id,
+                    "distance_m": round(float(np.linalg.norm(pos[i] - t.pos)), 1),
+                    "deadline_s": None if t.deadline is None else round((t.deadline - tick) * self.dt, 1),
+                    "heard_bid_m": None if bid is None else round(bid[0], 1),
+                })
+            out.append({"id": i, "tick": tick, "x": round(float(pos[i][0]), 1), "y": round(float(pos[i][1]), 1), "claim": self.claims[i].task if self.claims[i] else None, "known": known})
+        return out
+
+    def decide(self, tick: int, pos: np.ndarray, args: object | None = None) -> None:  # noqa: C901
         """Every agent (re)chooses a task by the policy; the oracle assigns everyone at once."""
+        if self.policy in EXTRA_ALLOC:
+            views = self.views(tick, pos)
+            try:
+                picks = list(EXTRA_ALLOC[self.policy](views, args))
+                if len(picks) != self.n:
+                    raise ValueError("an allocation policy must return one task per agent")
+                by_id = {t.id: t for t in self.tasks}
+                for i, tid in enumerate(picks):
+                    t = by_id.get(tid) if tid is not None else None
+                    self.claims[i] = Claim(t.id, float(np.linalg.norm(pos[i] - t.pos)), tick) if t is not None and t.open else None
+                return
+            except Exception as e:  # noqa: BLE001 - the swarm must keep moving
+                print(f"tick {tick}: alloc {self.policy} unavailable ({str(e)[:80]}); greedy for this decision", flush=True)
+                saved, self.policy = self.policy, "greedy"
+                try:
+                    self.decide(tick, pos)
+                finally:
+                    self.policy = saved
+                return
         if self.policy == "oracle":
             open_tasks = [t for t in self.tasks if t.open]
             self.claims = [None] * self.n
