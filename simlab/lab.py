@@ -216,7 +216,7 @@ class Lab:
             cwd = str(exp.get("cwd") or "{repo}").format(**raw, **{k: str(v) for k, v in merged.items()})
             argv = shlex.split(command)
             if argv[:1] == [self.python]:
-                argv[1:1] = ["-X", "utf8"]  # UTF-8 output on every platform, as a flag rather than an environment variable
+                argv[1:1] = ["-X", "utf8"]  # UTF-8 output on every platform
         except (KeyError, ValueError) as e:
             raise ValueError(f"the command needs a parameter that is not set, or is malformed: {e}") from e
         if not argv:
@@ -252,7 +252,7 @@ class Lab:
         t0 = time.time()
         try:
             with (run_dir / "stdout.log").open("w", encoding="utf-8") as log:
-                r = subprocess.run(  # the child inherits the environment; UTF-8 output comes from the flags
+                r = subprocess.run(  # a plain child process; UTF-8 output comes from the -X utf8 flag
                     argv,
                     cwd=cwd,
                     stdout=log,
@@ -706,14 +706,6 @@ class Lab:
 
 
 # -- helpers ------------------------------------------------------------------------------------------
-# A world process inherits the environment the way any child process does; the lab adds only the two
-# settings that make its output UTF-8. The lab itself reads no environment variable: nothing here
-# looks at a key, a token or anything else from the user's machine, and nothing is forwarded on purpose.
-def child_env() -> dict[str, str]:
-    """The two variables the lab adds to a world process's environment (UTF-8 output)."""
-    return {"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
-
-
 def _lab_version() -> str:
     from simlab import __version__
 

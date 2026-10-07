@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4 (2026-10-07)
+
+- No code in the repository, tests included, reads or copies the process environment any more (the test helper that checked an allow-list, and two test-side environment copies, are gone).
+
 ## 0.2.3 (2026-10-07)
 
 - The lab reads no environment variable at all: a world process inherits its environment the way any child process does, and UTF-8 output comes from `python -X utf8` on the command instead of two variables. (The directory's scan reads any `os.environ` access in an MCP server as "uses a credential from the user's machine", named or not.)

@@ -12,7 +12,7 @@
       "name": "sim-lab",
       "source": "./",
       "description": "A robotics simulation lab for Claude: ask what happens to a swarm, a formation, coverage or localisation under message loss, latency, noise, walls, water or fog, and Claude designs the experiment, runs it on your machine, compares the runs and answers with numbers you can reproduce.",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "author": {
         "name": "Naji Kayal"
       },

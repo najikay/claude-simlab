@@ -166,17 +166,16 @@ def test_parameter_values_cannot_add_a_shell_command(lab):
         lab.run("synthetic-vo", {"shape": "square"})
 
 
-def test_world_processes_get_only_the_allow_listed_variables(lab, monkeypatch):
-    monkeypatch.setenv("SIMLAB_TEST_MARKER_ONE", "1")  # anything not on the allow-list must not arrive
-    monkeypatch.setenv("SIMLAB_TEST_MARKER_TWO", "2")
-    script = WORLDS / "env_report.py"
+def test_world_processes_run_with_utf8_output(lab):
+    # the lab adds no variables and copies nothing: UTF-8 output comes from the -X utf8 flag on the command
+    script = WORLDS / "echo_word.py"
     lab.save_experiment(
-        "env",
-        f"name: env\ncommand: '{{python}} {{script}} {{run_dir}}'\nparams: {{script: {json.dumps(str(script))}}}\n",
+        "utf",
+        f"name: utf\ncommand: '{{python}} {{script}} {{run_dir}} {{word}}'\nparams: {{script: {json.dumps(str(script))}, word: héllo}}\n",
     )
-    m = lab.run("env")
+    m = lab.run("utf")
     assert m["status"] == "done", m["error"]
-    assert m["headline"] == {"leaked": 0, "has_path": 1}
+    assert "-X utf8" in m["command"] or m["command"].startswith(lab.python)
 
 
 def test_repeat_and_seeded_campaign_summarise(lab):

@@ -1,14 +1,13 @@
 """Regression tests for the findings of the pre-submission review."""
 
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from simlab.lab import child_env, plan_problems, validate_experiment
+from simlab.lab import plan_problems, validate_experiment
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -148,7 +147,6 @@ def test_the_real_stdio_loop(tmp_path):
         capture_output=True,
         text=True,
         timeout=60,
-        env={**os.environ, **child_env()},  # inherit, plus the lab's own two UTF-8 settings
         check=False,
     )
     lines = [json.loads(ln) for ln in r.stdout.splitlines() if ln.strip()]
