@@ -8,7 +8,7 @@ params:
   agents: 6
   ticks: 400
   arena: 40.0
-  alloc: greedy          # greedy | auction | oracle | random
+  alloc: greedy          # greedy | auction | cbaa | oracle | random
   decision_every: 5
   comms: range
   layout: none
@@ -29,11 +29,12 @@ params:
   rate: 0
   seed: 7
 outputs: {}
-metrics: [tasks_served, tasks_missed, served_pct, service_time_mean_s, service_time_p90_s, makespan_s, conflicts, msgs_per_served_task, distance_per_agent_m, msg_loss_pct, connected_pct, mean_lambda2, connectivity_holds_pct]
+metrics: [tasks_served, tasks_missed, tasks_open_at_end, served_pct, service_time_mean_s, service_time_p90_s, makespan_s, conflicts, msgs_per_served_task, distance_per_agent_m, msg_loss_pct, connected_pct, mean_lambda2, connectivity_holds_pct]
 variants:
   greedy:         { alloc: greedy }
   auction:        { alloc: auction }
   oracle:         { alloc: oracle }
+  cbaa:           { alloc: cbaa }
   random-control: { alloc: random }
   ideal:          { msg_loss: 0.0, msg_latency: 0 }
   lossy-comms:    { msg_loss: 0.5 }
@@ -53,5 +54,7 @@ variants:
   dense:          { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0 }   # the swarm depends on news: tasks arrive faster than one agent finds them
   dense-greedy:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: greedy }
   dense-auction:  { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: auction }
+  dense-cbaa:     { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: cbaa }
+  dense-random:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: random }
   dense-oracle:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, alloc: oracle }
   dense-silent:   { agents: 20, sense_range: 2.5, comm_range: 8.0, task_count: 10, task_rate: 10.0, deadline: 20.0, msg_loss: 1.0 }   # no message ever arrives: each agent serves what it senses

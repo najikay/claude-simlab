@@ -8,6 +8,11 @@ each agent picks a task by the allocation policy:
 ``greedy``   the nearest task it knows is open (it may collide with a neighbour's choice)
 ``auction``  bid = distance; a claim is broadcast; an agent that hears a lower bid on its task drops it
              and picks again (lowest bid wins, ties by id: a one-round distributed auction)
+``cbaa``     the consensus-based auction of Choi, Brunet and How (IEEE T-RO 2009), single-assignment:
+             each agent keeps the winning bid and winner it knows for every task, bids where its own
+             bid beats the winner, and neighbours merge their lists every tick (the better bid wins,
+             ties by lower id); on a connected graph the assignment is conflict-free after at most the
+             graph's diameter rounds. Bid = negative distance, the same currency as ``auction``
 ``oracle``   a central Hungarian assignment over the true state every decision tick (sees everything,
              sends nothing): the upper bound
 ``random``   a random known open task: the control
@@ -25,7 +30,7 @@ from pathlib import Path
 
 import numpy as np
 
-POLICIES = ["greedy", "auction", "oracle", "random"]
+POLICIES = ["greedy", "auction", "cbaa", "oracle", "random"]
 # an embedding project can add an allocation policy without forking (the workbench adds "laya"):
 # name -> callable(views, args) -> one chosen task id (or None) per view, in order. A view carries the
 # agent's id and position and the open tasks it knows (id, distance, seconds to the deadline, the best
@@ -141,6 +146,7 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
         self.known: list[dict[int, int]] = [{} for _ in range(n)]  # agent -> {task id: tick heard}
         self.heard_served: list[set[int]] = [set() for _ in range(n)]
         self.heard_bids: list[dict[int, tuple[float, int]]] = [{} for _ in range(n)]  # task -> (bid, agent)
+        self.winners: list[dict[int, tuple[float, int]]] = [{} for _ in range(n)]  # cbaa: task -> (bid, winner) as this agent knows it
         self.claims: list[Claim | None] = [None] * n
         self.queue: list[tuple[int, int, dict]] = []  # (deliver_at, dst, news)
         self.msgs_sent = 0
@@ -192,6 +198,7 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
                 "known": list(self.known[src].keys()),
                 "done": list(self.heard_served[src]),
                 "claim": (self.claims[src].task, self.claims[src].bid, src) if self.claims[src] else None,
+                "winners": dict(self.winners[src]) if self.policy == "cbaa" else None,
             }
             self.msgs_sent += 1
             if self.rnd.random() < self.loss:
@@ -209,6 +216,13 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
                 best = self.heard_bids[dst].get(tid)
                 if best is None or (bid, who) < best:
                     self.heard_bids[dst][tid] = (bid, who)
+            if news.get("winners"):
+                # max-consensus on the winning bids: keep the better (lower distance, then lower id) per task
+                mine = self.winners[dst]
+                for tid, (bid, who) in news["winners"].items():
+                    cur = mine.get(tid)
+                    if cur is None or (bid, who) < cur:
+                        mine[tid] = (bid, who)
 
     # -- the decision ------------------------------------------------------------------------
     def _open_known(self, i: int) -> list[Task]:
@@ -260,6 +274,9 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
                 for r, c in hungarian(cost):
                     self.claims[r] = Claim(open_tasks[c].id, float(cost[r, c]), tick)
             return
+        if self.policy == "cbaa":
+            self._decide_cbaa(tick, pos)
+            return
         for i in range(self.n):
             cur = self.claims[i]
             if cur is not None:
@@ -288,6 +305,38 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
             else:
                 t = min(cands, key=lambda x: float(np.linalg.norm(pos[i] - x.pos)))
             self.claims[i] = Claim(t.id, float(np.linalg.norm(pos[i] - t.pos)), tick)
+
+    def _decide_cbaa(self, tick: int, pos: np.ndarray) -> None:
+        """CBAA's bid phase for every agent: drop a task someone else now wins; otherwise keep it; with no
+        task, bid on the known open task where my bid beats the winning bid I know of."""
+        by_id = {t.id: t for t in self.tasks}
+        for i in range(self.n):
+            w = self.winners[i]
+            for tid in [t for t in w if t not in by_id or not by_id[t].open or t in self.heard_served[i]]:
+                del w[tid]  # finished or unknown tasks leave the lists
+            cur = self.claims[i]
+            if cur is not None:
+                win = w.get(cur.task)
+                if win is not None and win[1] != i:
+                    cur = None  # outbid: someone else is the winner now
+                elif cur.task not in by_id or not by_id[cur.task].open:
+                    cur = None
+            if cur is not None:
+                self.claims[i] = cur
+                continue
+            best_t, best_bid = None, None
+            for t in self._open_known(i):
+                bid = float(np.linalg.norm(pos[i] - t.pos))
+                win = w.get(t.id)
+                if win is not None and not ((bid, i) < win):
+                    continue  # someone bids better on it
+                if best_bid is None or bid < best_bid:
+                    best_t, best_bid = t, bid
+            if best_t is None:
+                self.claims[i] = None
+                continue
+            w[best_t.id] = (best_bid, i)
+            self.claims[i] = Claim(best_t.id, best_bid, tick)
 
     def target(self, i: int) -> np.ndarray | None:
         c = self.claims[i]
@@ -352,6 +401,7 @@ class TaskBoard:  # noqa: PLR0902 - the state of one mission
             "tasks_total": len(self.tasks),
             "tasks_served": len(served),
             "tasks_missed": len(missed),
+            "tasks_open_at_end": len(self.tasks) - len(served) - len(missed),
             "served_pct": round(100 * len(served) / max(1, len(self.tasks)), 1),
             "service_time_mean_s": round(float(np.mean(times)), 2) if times else None,
             "service_time_p90_s": round(float(p90), 2) if p90 is not None else None,

@@ -66,6 +66,7 @@ worlds:
       values:
       - greedy
       - auction
+      - cbaa
       - oracle
       - random
       means: 'swarm-tasks only: how an agent picks its task: greedy (nearest known open task), auction (bid = distance,
@@ -276,6 +277,7 @@ worlds:
     connectivity_holds_pct: agent-ticks on which the lambda2 floor overrode the mission (the price of staying connected)
     tasks_served: swarm-tasks; tasks an agent completed (higher is better)
     tasks_missed: swarm-tasks; tasks whose deadline passed unserved
+    tasks_open_at_end: swarm-tasks; tasks neither served nor missed when the run ended
     served_pct: swarm-tasks; served over all tasks that appeared (higher is better)
     service_time_mean_s: swarm-tasks; mean seconds from a task's arrival to its service
     service_time_p90_s: swarm-tasks; the slow tail of the same

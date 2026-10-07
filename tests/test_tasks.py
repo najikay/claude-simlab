@@ -167,3 +167,29 @@ def test_an_embedding_project_can_register_an_allocation_policy():
     finally:
         tasks.EXTRA_ALLOC.pop("far", None)
         tasks.EXTRA_ALLOC.pop("broken", None)
+
+
+def test_cbaa_resolves_conflicts_by_consensus():
+    # two agents, one task: both bid, the exchange tells the farther one it lost, it gives way
+    pos = np.array([[10.0, 10.0], [14.0, 10.0]])
+    b = board("cbaa")
+    b.tasks.append(tasks.Task(id=0, pos=np.array([12.5, 10.0]), size_ticks=3, arrival=0, deadline=None))
+    b.sense(0, pos)
+    b.decide(0, pos)
+    assert [c.task for c in b.claims] == [0, 0]  # before any exchange both think they won
+    b.exchange(1, [(0, 1), (1, 0)])
+    b.decide(1, pos)
+    assert b.claims[0] is None and b.claims[1] is not None and b.claims[1].task == 0  # agent 1 is nearer (1.5 m vs 2.5 m)
+    assert b.winners[0][0] == b.winners[1][0] == (1.5, 1)
+    # a chain of three with the task at the far end: the consensus reaches the first agent after two rounds
+    pos3 = np.array([[0.0, 0.0], [5.0, 0.0], [10.0, 0.0]])
+    b3 = board("cbaa", n=3)
+    b3.tasks.append(tasks.Task(id=0, pos=np.array([11.0, 0.0]), size_ticks=3, arrival=0, deadline=None))
+    b3.sense(0, pos3)
+    b3.decide(0, pos3)
+    assert all(c is not None and c.task == 0 for c in b3.claims)
+    chain = [(0, 1), (1, 0), (1, 2), (2, 1)]
+    for tick in (1, 2):
+        b3.exchange(tick, chain)
+        b3.decide(tick, pos3)
+    assert [c.task if c else None for c in b3.claims] == [None, None, 0] and b3.winners[0][0] == (1.0, 2)
